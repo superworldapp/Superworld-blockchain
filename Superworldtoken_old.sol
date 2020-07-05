@@ -1,6 +1,7 @@
-pragma solidity ^0.4.20;
+pragma solidity ^0.4.24;
 
-import "zeppelin-solidity/contracts/token/ERC721/ERC721Token.sol";
+import 'https://github.com/OpenZeppelin/openzeppelin-contracts/contracts/token/ERC721/ERC721Token.sol';
+
 
 
 contract ERC20Interface {
@@ -10,7 +11,9 @@ contract ERC20Interface {
 
 
 contract SuperWorldToken is ERC721Token {
-
+    
+   
+    
 	address public owner;
 	address public coinAddress;
 	ERC20Interface public superWorldCoin;
@@ -20,6 +23,20 @@ contract SuperWorldToken is ERC721Token {
 	uint public basePrice;
 	uint public buyId = 0;
 	uint public listId = 0;
+	
+	 struct GeosByTokenIdsStruct {
+		uint tokenId;
+		string lat;
+		string lon;
+	}
+
+
+    mapping(uint => GeosByTokenIdsStruct[]) public geosByTokenIds;
+  
+      // tokenId -> lon
+    mapping(uint => bool) public lonByTokenId;
+    // tokenId -> lat
+    mapping(uint => bool) public latByTokenId;
 
 	// tokenId => base price in wei
 	mapping(uint => uint) public basePrices;
@@ -54,9 +71,8 @@ contract SuperWorldToken is ERC721Token {
 	event EventListToken(uint listId, uint buyId, string lon, string lat, address indexed seller, uint price, bool isListed, uint timestamp);
 	event EventListTokenId1(uint listId, uint buyId, uint indexed tokenId1, string lon, string lat, address seller, uint price, bool isListed, uint timestamp);
 	event EventReceiveApproval(address buyer, uint coins, address _coinAddress, bytes32 _data);
-
-
-	constructor(address _coinAddress, uint _percentageCut, uint _basePrice)
+    
+	constructor(address _coinAddress, uint _percentageCut, uint _basePrice, string base)
 	public
 	ERC721Token("SuperWorld", "SUPERWORLD") {
 		owner = msg.sender;
@@ -66,9 +82,12 @@ contract SuperWorldToken is ERC721Token {
 		basePrice = _basePrice;
 		buyId = 0;
 		listId = 0;
+		_setBaseURI(base);
 	}
 
-
+    
+    
+    
 	function setBasePrice(uint _basePrice) public {
 		require(msg.sender == owner);
 		require(_basePrice > 0);
@@ -106,6 +125,26 @@ contract SuperWorldToken is ERC721Token {
 	function getTokenId(string lon, string lat) pure public returns (uint) {
 		return uint(keccak256(abi.encodePacked(lon, ",", lat)));
 	}
+	//added setGeoByTokenId 
+	 function setGeoByTokenId(uint _tokenId, string _lat, string _lon) public {
+        lonByTokenId[_tokenId] = true;
+        latByTokenId[_tokenId] = true;
+        geosByTokenIds[_tokenId].push(GeosByTokenIdsStruct(_tokenId, _lat, _lon));
+    }
+    
+    //added getGeoFromTokenId 
+    function getGeoFromTokenId(uint tokenId) view public returns(string memory, string memory) {
+      if(lonByTokenId[tokenId] && latByTokenId[tokenId] == true){
+      return (geosByTokenIds[tokenId][0].lat, geosByTokenIds[tokenId][0].lon);
+      }
+      else if(lonByTokenId[tokenId] && latByTokenId[tokenId] == true) {
+          return(
+              //get lon and lat from oracle
+              '',''
+          );
+      }
+    }
+
 
 
 	// getInfo: tokenId, tokenOwner, isOwned, isSelling, price
