@@ -32,19 +32,6 @@ contract SuperWorldToken is ERC721 {
     uint256 public basePrice;
     uint256 public buyId = 0;
     uint256 public listId = 0;
-    
-    // added geosByTokenIds
-    struct GeosByTokenIdsStruct {
-		uint tokenId;
-		string lat;
-		string lon;
-	}
-
-    // tokenId => geosByTokenIdsStruct
-    mapping(uint256 => GeosByTokenIdsStruct) public geosByTokenIds;
-    
-    // tokenId -> is geo ID set
-    // mapping(uint256 => bool) private isGeoSet;
 
     // tokenId => base price in wei
     mapping(uint256 => uint256) public basePrices;
@@ -68,6 +55,15 @@ contract SuperWorldToken is ERC721 {
     }
     // tokenId => token history array
     mapping(uint256 => TokenHistory[]) public tokenHistories;
+
+    struct GeosByTokenIdsStruct {
+		uint tokenId;
+		string lat;
+		string lon;
+	}
+
+    // tokenId => geosByTokenIdsStruct
+    mapping(uint256 => GeosByTokenIdsStruct) private geosByTokenIds;
 
     // events
     // TODO: add timestamp (block or UTC)
@@ -193,16 +189,24 @@ contract SuperWorldToken is ERC721 {
         return geoId.tokenId != 0;
     }
     
-    function setGeoByTokenId(uint256 _tokenId, string memory _lat, string memory _lon) private {
-	geosByTokenIds[_tokenId] = GeosByTokenIdsStruct(_tokenId, _lat, _lon);
+	function setGeoByTokenId(uint256 _tokenId, string memory _lat, string memory _lon) private {
+        // isGeoSet[_tokenId] = true;
+        geosByTokenIds[_tokenId] = GeosByTokenIdsStruct(_tokenId, _lat, _lon);
     }
     
-    function getGeoFromTokenId(uint256 tokenId) public view returns (string memory, string memory) {
+    function getGeoFromTokenId(uint256 tokenId)
+        public
+        view
+        returns (
+            string memory lat,
+            string memory lon
+        )
+    {
         if (isGeoSet(tokenId)) {
             return (geosByTokenIds[tokenId].lat, geosByTokenIds[tokenId].lon);
         } else {
             return (
-              // get lon and lat from oracle
+              // TODO: get lon and lat from oracle
               '',''
             );
         }
@@ -212,19 +216,23 @@ contract SuperWorldToken is ERC721 {
         public
         view
         returns (
-            uint256,
-            address,
-            bool,
-            bool,
-            uint256
+            uint256 tokenId,
+            address tokenOwner,
+            bool isOwned,
+            bool isSelling,
+            uint256 price
         )
     {
-        uint256 tokenId = uint256(getTokenId(lon, lat));
-        address tokenowner = EnumerableMap.get(_tokenOwners, tokenId); // address _tokenOwner = tokenOwner[tokenId];
-        bool isOwned = tokenowner != address(0); // bool isOwned = tokenowner != 0x0;
-        bool isSelling = isSellings[tokenId];
-        uint256 price = getPrice(tokenId);
-        return (tokenId, tokenowner, isOwned, isSelling, price);
+        tokenId = uint256(getTokenId(lon, lat));
+        if (EnumerableMap.contains(_tokenOwners, tokenId)) {
+            tokenOwner = EnumerableMap.get(_tokenOwners, tokenId);
+            isOwned = true;
+        } else {
+            tokenOwner = address(0);
+            isOwned = false;
+        }
+        isSelling = isSellings[tokenId];
+        price = getPrice(tokenId);
     }
 
     function receiveApproval(
@@ -278,10 +286,10 @@ contract SuperWorldToken is ERC721 {
     {
         uint256 tokenId = uint256(getTokenId(lon, lat));
         uint256 offerPrice = msg.value;
-        address seller = address(0x0); // _tokenOwners[tokenId];
+        // address seller = address(0x0); // _tokenOwners[tokenId];
 
         // unique token not bought yet
-        if (seller == address(0x0)) {
+        if (!EnumerableMap.contains(_tokenOwners, tokenId)) {
             require(offerPrice >= basePrice);
             require(offerPrice >= basePrices[tokenId]);
             createToken(msg.sender, tokenId, offerPrice);
@@ -291,13 +299,14 @@ contract SuperWorldToken is ERC721 {
                 lon,
                 lat,
                 msg.sender,
-                seller,
+                address(0),
                 offerPrice,
                 now
             );
             return true;
         }
 
+        address seller = EnumerableMap.get(_tokenOwners, tokenId);
         // check selling
         require(isSellings[tokenId] == true);
         // check sell price > 0
@@ -455,7 +464,7 @@ contract SuperWorldToken is ERC721 {
     }
 
     function getPrice(uint256 tokenId) public view returns (uint256) {
-        if (EnumerableMap.get(_tokenOwners, tokenId) == address(0)) {
+        if (!EnumerableMap.contains(_tokenOwners, tokenId)) {
             // not owned
             uint256 _basePrice = basePrices[tokenId];
             if (_basePrice == 0) {
