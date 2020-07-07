@@ -126,7 +126,8 @@ contract SuperWorldToken is ERC721 {
     constructor(
         address _coinAddress,
         uint256 _percentageCut,
-        uint256 _basePrice
+        uint256 _basePrice,
+	string memory metaUrl
     ) public ERC721("SuperWorld", "SUPERWORLD") {
         owner = msg.sender;
         coinAddress = _coinAddress;
@@ -135,6 +136,7 @@ contract SuperWorldToken is ERC721 {
         basePrice = _basePrice;
         buyId = 0;
         listId = 0;
+	_setBaseURI(metaUrl);
     }
 
     function setBasePrice(uint256 _basePrice) public {
