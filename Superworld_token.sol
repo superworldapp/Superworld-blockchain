@@ -43,10 +43,8 @@ contract SuperWorldToken is ERC721 {
     // tokenId => geosByTokenIdsStruct
     mapping(uint256 => GeosByTokenIdsStruct) public geosByTokenIds;
     
-    // tokenId -> is lon set
-    mapping(uint => bool) public lonByTokenId;
-    // tokenId -> is lat set
-    mapping(uint => bool) public latByTokenId;
+    // tokenId -> is geo ID set
+    // mapping(uint256 => bool) private isGeoSet;
 
     // tokenId => base price in wei
     mapping(uint256 => uint256) public basePrices;
@@ -188,16 +186,19 @@ contract SuperWorldToken is ERC721 {
         return keccak256(abi.encodePacked(lon, ",", lat));
     }
     
-    // added setGeoByTokenId 
-	function setGeoByTokenId(uint256 _tokenId, string memory _lat, string memory _lon) public {
-        lonByTokenId[_tokenId] = true;
-        latByTokenId[_tokenId] = true;
-        geosByTokenIds[_tokenId] = GeosByTokenIdsStruct(_tokenId, _lat, _lon);
+    // added function
+    function isGeoSet(uint256 _tokenId) private view returns (bool) {
+        GeosByTokenIdsStruct memory geoId = geosByTokenIds[_tokenId];
+        // if the mapping doesn't contain _tokenId, geoId.tokenId == 0
+        return geoId.tokenId != 0;
     }
     
-    // added getGeoFromTokenId
-    function getGeoFromTokenId(uint256 tokenId) view public returns (string memory, string memory) {
-        if (lonByTokenId[tokenId] && latByTokenId[tokenId]) {
+    function setGeoByTokenId(uint256 _tokenId, string memory _lat, string memory _lon) private {
+	geosByTokenIds[_tokenId] = GeosByTokenIdsStruct(_tokenId, _lat, _lon);
+    }
+    
+    function getGeoFromTokenId(uint256 tokenId) public view returns (string memory, string memory) {
+        if (isGeoSet(tokenId)) {
             return (geosByTokenIds[tokenId].lat, geosByTokenIds[tokenId].lon);
         } else {
             return (
@@ -254,6 +255,7 @@ contract SuperWorldToken is ERC721 {
                 return false;
             }
             createToken(buyer, tokenId, basePrice);
+            setGeoByTokenId(tokenId, lat, lon);
             emitBuyTokenEvents(
                 tokenId,
                 lon,
@@ -283,6 +285,7 @@ contract SuperWorldToken is ERC721 {
             require(offerPrice >= basePrice);
             require(offerPrice >= basePrices[tokenId]);
             createToken(msg.sender, tokenId, offerPrice);
+            setGeoByTokenId(tokenId, lat, lon);
             emitBuyTokenEvents(
                 tokenId,
                 lon,
