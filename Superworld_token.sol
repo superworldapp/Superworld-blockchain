@@ -127,7 +127,7 @@ contract SuperWorldToken is ERC721 {
         address _coinAddress,
         uint256 _percentageCut,
         uint256 _basePrice,
-	string memory metaUrl
+        string memory metaUrl
     ) public ERC721("SuperWorld", "SUPERWORLD") {
         owner = msg.sender;
         coinAddress = _coinAddress;
@@ -136,7 +136,7 @@ contract SuperWorldToken is ERC721 {
         basePrice = _basePrice;
         buyId = 0;
         listId = 0;
-	_setBaseURI(metaUrl);
+        _setBaseURI(metaUrl);
     }
 
     function setBasePrice(uint256 _basePrice) public {
@@ -256,9 +256,10 @@ contract SuperWorldToken is ERC721 {
         string memory lat
     ) public returns (bool) {
         uint256 tokenId = uint256(getTokenId(lon, lat));
-        address seller = EnumerableMap.get(_tokenOwners, tokenId);
+        // address seller = EnumerableMap.get(_tokenOwners, tokenId);
 
-        if (seller == address(0x0)) {
+        if (!EnumerableMap.contains(_tokenOwners, tokenId)) {
+            // not owned
             require(coins >= basePrice);
             require(superWorldCoin.balanceOf(buyer) >= basePrice);
             if (!superWorldCoin.transferFrom(buyer, address(this), basePrice)) {
@@ -266,12 +267,13 @@ contract SuperWorldToken is ERC721 {
             }
             createToken(buyer, tokenId, basePrice);
             setGeoByTokenId(tokenId, lat, lon);
+            EnumerableMap.set(_tokenOwners, tokenId, buyer); // ???
             emitBuyTokenEvents(
                 tokenId,
                 lon,
                 lat,
                 buyer,
-                seller,
+                address(0),
                 basePrice,
                 now
             );
@@ -296,6 +298,7 @@ contract SuperWorldToken is ERC721 {
             require(offerPrice >= basePrices[tokenId]);
             createToken(msg.sender, tokenId, offerPrice);
             setGeoByTokenId(tokenId, lat, lon);
+            EnumerableMap.set(_tokenOwners, tokenId, msg.sender); // ???
             emitBuyTokenEvents(
                 tokenId,
                 lon,
@@ -350,6 +353,7 @@ contract SuperWorldToken is ERC721 {
         _holderTokens[msg.sender].add(tokenId);
         recordTransaction(tokenId, offerPrice);
         sellPrices[tokenId] = offerPrice;
+        EnumerableMap.set(_tokenOwners, tokenId, msg.sender); // ???
         emitBuyTokenEvents(
             tokenId,
             lon,
