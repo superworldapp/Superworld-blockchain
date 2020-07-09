@@ -207,23 +207,24 @@ contract SuperWorldToken is ERC721 {
         public
         view
         returns (
-            uint256 tokenId,
+            bytes32 tokenId,
             address tokenOwner,
             bool isOwned,
             bool isSelling,
             uint256 price
         )
     {
-        tokenId = uint256(getTokenId(lat, lon));
-        if (EnumerableMap.contains(_tokenOwners, tokenId)) {
-            tokenOwner = EnumerableMap.get(_tokenOwners, tokenId);
+        tokenId = getTokenId(lat, lon);
+        uint256 intTokenId = uint256(tokenId);
+        if (EnumerableMap.contains(_tokenOwners, intTokenId)) {
+            tokenOwner = EnumerableMap.get(_tokenOwners, intTokenId);
             isOwned = true;
         } else {
             tokenOwner = address(0);
             isOwned = false;
         }
-        isSelling = isSellings[tokenId];
-        price = getPrice(tokenId);
+        isSelling = isSellings[intTokenId];
+        price = getPrice(intTokenId);
     }
 
     function receiveApproval(
