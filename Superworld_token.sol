@@ -56,15 +56,6 @@ contract SuperWorldToken is ERC721 {
     // tokenId => token history array
     mapping(uint256 => TokenHistory[]) public tokenHistories;
 
-    struct GeosByTokenIdsStruct {
-		uint tokenId;
-		string lat;
-		string lon;
-	}
-
-    // tokenId => geosByTokenIdsStruct
-    mapping(uint256 => GeosByTokenIdsStruct) private geosByTokenIds;
-
     // events
     // TODO: add timestamp (block or UTC)
     event EventBuyToken(
@@ -146,13 +137,13 @@ contract SuperWorldToken is ERC721 {
     }
 
     function setBasePrice(
-        string memory lon,
         string memory lat,
+        string memory lon,
         uint256 _basePrice
     ) public {
         require(msg.sender == owner);
         require(_basePrice > 0);
-        uint256 tokenId = uint256(getTokenId(lon, lat));
+        uint256 tokenId = uint256(getTokenId(lat, lon));
         basePrices[tokenId] = _basePrice;
     }
 
@@ -176,45 +167,43 @@ contract SuperWorldToken is ERC721 {
         tokenHistories[tokenId].push(TokenHistory(tokenId, msg.sender, price));
     }
 
-    function getTokenId(string memory lon, string memory lat)
+    function getTokenId(string memory lat, string memory lon)
         public
         pure
-        returns (bytes32)
+        returns (bytes32 tokenId)
     {
-        return keccak256(abi.encodePacked(lon, ",", lat));
+        if (bytes(lat).length == 0 || bytes(lon).length == 0) {
+            return 0x0;
+        }
+        
+        string memory geo = string(abi.encodePacked(lat, ",", lon));
+        assembly {
+            tokenId := mload(add(geo, 32))
+        }
     }
     
-    // added function
-    function isGeoSet(uint256 _tokenId) private view returns (bool) {
-        GeosByTokenIdsStruct memory geoId = geosByTokenIds[_tokenId];
-        // if the mapping doesn't contain _tokenId, geoId.tokenId == 0
-        return geoId.tokenId != 0;
-    }
-    
-	function setGeoByTokenId(uint256 _tokenId, string memory _lat, string memory _lon) private {
-        // isGeoSet[_tokenId] = true;
-        geosByTokenIds[_tokenId] = GeosByTokenIdsStruct(_tokenId, _lat, _lon);
-    }
-    
-    function getGeoFromTokenId(uint256 tokenId)
+    function getGeoFromTokenId(bytes32 tokenId)
         public
-        view
+        pure
         returns (
             string memory lat,
             string memory lon
         )
     {
-        if (isGeoSet(tokenId)) {
-            return (geosByTokenIds[tokenId].lat, geosByTokenIds[tokenId].lon);
-        } else {
-            return (
-              // TODO: get lon and lat from oracle
-              '',''
-            );
+        uint8 n = 32;
+        while (n > 0 && tokenId[n-1] == 0) {
+            n--;
         }
+        bytes memory bytesArray = new bytes(n);
+        for (uint8 i = 0; i < n; i++) {
+            bytesArray[i] = tokenId[i];
+        }
+        string memory geoId = string(bytesArray);
+        lat = getLat(geoId);
+        lon = getLon(geoId);
     }
 
-    function getInfo(string memory lon, string memory lat)
+    function getInfo(string memory lat, string memory lon)
         public
         view
         returns (
@@ -225,7 +214,7 @@ contract SuperWorldToken is ERC721 {
             uint256 price
         )
     {
-        tokenId = uint256(getTokenId(lon, lat));
+        tokenId = uint256(getTokenId(lat, lon));
         if (EnumerableMap.contains(_tokenOwners, tokenId)) {
             tokenOwner = EnumerableMap.get(_tokenOwners, tokenId);
             isOwned = true;
@@ -246,16 +235,16 @@ contract SuperWorldToken is ERC721 {
         emit EventReceiveApproval(buyer, coins, _coinAddress, _data);
         require(_coinAddress == coinAddress);
         string memory dataString = bytes32ToString(_data);
-        buyTokenWithCoins(buyer, coins, getLon(dataString), getLat(dataString));
+        buyTokenWithCoins(buyer, coins, getLat(dataString), getLon(dataString));
     }
 
     function buyTokenWithCoins(
         address buyer,
         uint256 coins,
-        string memory lon,
-        string memory lat
+        string memory lat,
+        string memory lon
     ) public returns (bool) {
-        uint256 tokenId = uint256(getTokenId(lon, lat));
+        uint256 tokenId = uint256(getTokenId(lat, lon));
         // address seller = EnumerableMap.get(_tokenOwners, tokenId);
 
         if (!EnumerableMap.contains(_tokenOwners, tokenId)) {
@@ -266,8 +255,7 @@ contract SuperWorldToken is ERC721 {
                 return false;
             }
             createToken(buyer, tokenId, basePrice);
-            setGeoByTokenId(tokenId, lat, lon);
-            EnumerableMap.set(_tokenOwners, tokenId, buyer); // ???
+            EnumerableMap.set(_tokenOwners, tokenId, buyer);
             emitBuyTokenEvents(
                 tokenId,
                 lon,
@@ -283,12 +271,12 @@ contract SuperWorldToken is ERC721 {
         return false;
     }
 
-    function buyToken(string memory lon, string memory lat)
+    function buyToken(string memory lat, string memory lon)
         public
         payable
         returns (bool)
     {
-        uint256 tokenId = uint256(getTokenId(lon, lat));
+        uint256 tokenId = uint256(getTokenId(lat, lon));
         uint256 offerPrice = msg.value;
         // address seller = address(0x0); // _tokenOwners[tokenId];
 
@@ -297,8 +285,7 @@ contract SuperWorldToken is ERC721 {
             require(offerPrice >= basePrice);
             require(offerPrice >= basePrices[tokenId]);
             createToken(msg.sender, tokenId, offerPrice);
-            setGeoByTokenId(tokenId, lat, lon);
-            EnumerableMap.set(_tokenOwners, tokenId, msg.sender); // ???
+            EnumerableMap.set(_tokenOwners, tokenId, msg.sender);
             emitBuyTokenEvents(
                 tokenId,
                 lon,
@@ -353,7 +340,7 @@ contract SuperWorldToken is ERC721 {
         _holderTokens[msg.sender].add(tokenId);
         recordTransaction(tokenId, offerPrice);
         sellPrices[tokenId] = offerPrice;
-        EnumerableMap.set(_tokenOwners, tokenId, msg.sender); // ???
+        EnumerableMap.set(_tokenOwners, tokenId, msg.sender);
         emitBuyTokenEvents(
             tokenId,
             lon,
@@ -388,9 +375,9 @@ contract SuperWorldToken is ERC721 {
         );
         emit EventBuyTokenId1(
             buyId,
-            uint256(getTokenId(truncateDecimals(lon, 1), truncateDecimals(lat, 1))),
-            (truncateDecimals(lon, 1),
-            (truncateDecimals(lon, 1),
+            uint256(getTokenId(truncateDecimals(lat, 1), truncateDecimals(lon, 1))),
+            truncateDecimals(lon, 1),
+            truncateDecimals(lat, 1),
             buyer,
             seller,
             offerPrice,
@@ -401,11 +388,12 @@ contract SuperWorldToken is ERC721 {
     // list / delist
 
     function listToken(
-        string memory lon,
         string memory lat,
+        string memory lon,
         uint256 sellPrice
     ) public {
-        uint256 tokenId = uint256(getTokenId(lon, lat));
+        uint256 tokenId = uint256(getTokenId(lat, lon));
+        require(EnumerableMap.contains(_tokenOwners, tokenId));
         require(msg.sender == EnumerableMap.get(_tokenOwners, tokenId));
         isSellings[tokenId] = true;
         sellPrices[tokenId] = sellPrice;
@@ -420,8 +408,9 @@ contract SuperWorldToken is ERC721 {
         );
     }
 
-    function delistToken(string memory lon, string memory lat) public {
-        uint256 tokenId = uint256(getTokenId(lon, lat));
+    function delistToken(string memory lat, string memory lon) public {
+        uint256 tokenId = uint256(getTokenId(lat, lon));
+        require(EnumerableMap.contains(_tokenOwners, tokenId));
         require(msg.sender == EnumerableMap.get(_tokenOwners, tokenId));
         isSellings[tokenId] = false;
         emitListTokenEvents(
@@ -538,12 +527,12 @@ contract SuperWorldToken is ERC721 {
         return 0;
     }
 
-    function getLon(string memory str) private pure returns (string memory) {
+    function getLat(string memory str) private pure returns (string memory) {
         uint256 index = indexOfComma(str);
         return substring(str, 0, index);
     }
 
-    function getLat(string memory str) private pure returns (string memory) {
+    function getLon(string memory str) private pure returns (string memory) {
         uint256 index = indexOfComma(str);
         return substring(str, index + 1, 0);
     }
