@@ -385,8 +385,8 @@ contract SuperWorldToken is ERC721 {
         emit EventBuyTokenId1(
             buyId,
             uint256(getTokenId(truncateDecimals(lon, 1), truncateDecimals(lat, 1))),
-            lon,
-            lat,
+            (truncateDecimals(lon, 1),
+            (truncateDecimals(lon, 1),
             buyer,
             seller,
             offerPrice,
