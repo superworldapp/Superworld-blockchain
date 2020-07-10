@@ -4,9 +4,10 @@ pragma solidity ^0.6.0;
 // 0x0A7a9dd62Af0638DE94903235682d1630DF09Cf3 use for ropsten coin   rinkeby 0x47c393cb164A0D58Ac757d4615e72f62eC170fE8
 // 10 percentage cut
 // 1000000000000000 baseprice
-// http://geo.superworldapp.com/api/json/metadata/get/<tokenId> metaurl
+// http://geo.superworldapp.com/api/json/metadata/get/ metaurl
 
 import "https://github.com/kole-swapnil/openzepkole/token/ERC721/ERC721.sol";
+import "https://github.com/kole-swapnil/openzepkole/access/Ownable.sol";
 
 
 abstract contract ERC20Interface {
@@ -24,8 +25,8 @@ abstract contract ERC20Interface {
 }
 
 
-contract SuperWorldToken is ERC721 {
-    address public owner;
+contract SuperWorldToken is ERC721, Ownable {
+    // address public owner;
     address public coinAddress;
     ERC20Interface public superWorldCoin;
 
@@ -56,6 +57,10 @@ contract SuperWorldToken is ERC721 {
     }
     // tokenId => token history array
     mapping(uint256 => TokenHistory[]) public tokenHistories;
+
+    // Bulk transfer and listing mappings
+    // uint256(tokenId) => token owner
+    EnumerableMap.UintToAddressMap internal _tokenIdToOwner;
 
     // events
     // TODO: add timestamp (block or UTC)
@@ -121,7 +126,7 @@ contract SuperWorldToken is ERC721 {
         uint256 _basePrice,
         string memory metaUrl
     ) public ERC721("SuperWorld", "SUPERWORLD") {
-        owner = msg.sender;
+        // owner = msg.sender;
         coinAddress = _coinAddress;
         superWorldCoin = ERC20Interface(coinAddress);
         percentageCut = _percentageCut;
@@ -130,9 +135,9 @@ contract SuperWorldToken is ERC721 {
         listId = 0;
         _setBaseURI(metaUrl);
     }
-
+    
     function setBasePrice(uint256 _basePrice) public {
-        require(msg.sender == owner);
+        require(msg.sender == owner());
         require(_basePrice > 0);
         basePrice = _basePrice;
     }
@@ -142,14 +147,14 @@ contract SuperWorldToken is ERC721 {
         string memory lon,
         uint256 _basePrice
     ) public {
-        require(msg.sender == owner);
+        require(msg.sender == owner());
         require(_basePrice > 0);
         uint256 tokenId = uint256(getTokenId(lat, lon));
         basePrices[tokenId] = _basePrice;
     }
 
     function setPercentageCut(uint256 _percentageCut) public {
-        require(msg.sender == owner);
+        require(msg.sender == owner());
         require(_percentageCut > 0);
         percentageCut = _percentageCut;
     }
@@ -227,7 +232,40 @@ contract SuperWorldToken is ERC721 {
         isSelling = isSellings[intTokenId];
         price = getPrice(intTokenId);
     }
-
+    
+    // Bulk transfer
+    function addToTransferMap(string calldata lat, string calldata lon, address tokenOwner) external onlyOwner() {
+        uint256 tokenId = uint256(getTokenId(lat, lon));
+        EnumerableMap.set(_tokenIdToOwner, tokenId, tokenOwner);
+    }
+    
+    // Warning: this function may only be called once.
+    function bulkTransfer() external onlyOwner() {
+        uint256 n = EnumerableMap.length(_tokenIdToOwner);
+        for (uint8 i = 0; i < n; i++) {
+            (uint256 intTokenId, address tokenOwner) = EnumerableMap.at(_tokenIdToOwner, i);
+            giftToken(intTokenId, tokenOwner);
+        }
+    }
+    
+    function giftToken(uint256 tokenId, address tokenOwner) private {
+        basePrices[tokenId] = 0;
+        _mint(tokenOwner, tokenId);
+        recordTransaction(tokenId, basePrice);
+        EnumerableMap.set(_tokenOwners, tokenId, tokenOwner);
+        basePrices[tokenId] = basePrice;
+        (string memory lat, string memory lon) = getGeoFromTokenId(bytes32(tokenId));
+        emitBuyTokenEvents(
+            tokenId,
+            lon,
+            lat,
+            tokenOwner,
+            address(0),
+            basePrice,
+            now
+        );
+    }
+    
     function receiveApproval(
         address buyer,
         uint256 coins,
@@ -580,7 +618,7 @@ contract SuperWorldToken is ERC721 {
     }
 
     function withdrawBalance() public payable {
-        require(msg.sender == owner);
+        require(msg.sender == owner());
         uint256 balance = address(this).balance;
         (msg.sender).transfer(balance);
     }
