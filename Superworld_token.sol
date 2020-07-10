@@ -4,6 +4,7 @@ pragma solidity ^0.6.0;
 // 0x0A7a9dd62Af0638DE94903235682d1630DF09Cf3 use for ropsten coin   rinkeby 0x47c393cb164A0D58Ac757d4615e72f62eC170fE8
 // 10 percentage cut
 // 1000000000000000 baseprice
+// http://geo.superworldapp.com/api/json/metadata/get/<tokenId> metaurl
 
 import "https://github.com/kole-swapnil/openzepkole/token/ERC721/ERC721.sol";
 
