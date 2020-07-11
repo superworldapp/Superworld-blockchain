@@ -49,15 +49,6 @@ contract SuperWorldToken is ERC721, Ownable {
     // tokenId => buyId
     mapping(uint256 => uint256) public buyIds;
 
-    // token history
-    struct TokenHistory {
-        uint256 tokenId;
-        address owner;
-        uint256 price;
-    }
-    // tokenId => token history array
-    mapping(uint256 => TokenHistory[]) public tokenHistories;
-
     // Bulk transfer and listing mappings
     // uint256(tokenId) => token owner
     EnumerableMap.UintToAddressMap internal _tokenIdToOwner;
@@ -73,7 +64,8 @@ contract SuperWorldToken is ERC721, Ownable {
         address indexed buyer,
         address indexed seller,
         uint256 price,
-        uint256 timestamp
+        uint256 timestamp,
+        bytes32 indexed tokenId
     );
     event EventBuyTokenFail(
         uint256 buyId,
@@ -102,7 +94,8 @@ contract SuperWorldToken is ERC721, Ownable {
         address indexed seller,
         uint256 price,
         bool isListed,
-        uint256 timestamp
+        uint256 timestamp,
+        bytes32 indexed tokenId
     );
     event EventListTokenId1(
         uint256 listId,
@@ -172,7 +165,7 @@ contract SuperWorldToken is ERC721, Ownable {
 
     function recordTransaction(uint256 tokenId, uint256 price) private {
         boughtPrices[tokenId] = price;
-        tokenHistories[tokenId].push(TokenHistory(tokenId, msg.sender, price));
+        // tokenHistories[tokenId].push(TokenHistory(tokenId, msg.sender, price));
     }
 
     function getTokenId(string memory lat, string memory lon)
@@ -426,7 +419,8 @@ contract SuperWorldToken is ERC721, Ownable {
             buyer,
             seller,
             offerPrice,
-            timestamp
+            timestamp,
+            bytes32(tokenId)
         );
         emit EventBuyTokenId1(
             buyId,
@@ -490,6 +484,7 @@ contract SuperWorldToken is ERC721, Ownable {
         uint256 timestamp
     ) private {
         listId++;
+        bytes32 tokenId = getTokenId(lat, lon);
         emit EventListToken(
             listId,
             _buyId,
@@ -498,7 +493,8 @@ contract SuperWorldToken is ERC721, Ownable {
             seller,
             sellPrice,
             isListed,
-            timestamp
+            timestamp,
+            tokenId
         );
         emit EventListTokenId1(
             listId,
