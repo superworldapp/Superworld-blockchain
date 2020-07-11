@@ -61,6 +61,8 @@ contract SuperWorldToken is ERC721, Ownable {
     // Bulk transfer and listing mappings
     // uint256(tokenId) => token owner
     EnumerableMap.UintToAddressMap internal _tokenIdToOwner;
+    // uint256(tokenId) => sell prices
+    mapping (uint256 => uint256) internal _transferSellPrices;
 
     // events
     // TODO: add timestamp (block or UTC)
@@ -234,21 +236,22 @@ contract SuperWorldToken is ERC721, Ownable {
     }
     
     // Bulk transfer
-    function addToTransferMap(string calldata lat, string calldata lon, address tokenOwner) external onlyOwner() {
+    function addToTransferMap(string calldata lat, string calldata lon, address tokenOwner, uint256 sellPrice) external onlyOwner() {
         uint256 tokenId = uint256(getTokenId(lat, lon));
         EnumerableMap.set(_tokenIdToOwner, tokenId, tokenOwner);
+        _transferSellPrices[tokenId] = sellPrice;
     }
     
     // Warning: this function may only be called once.
-    function bulkTransfer() external onlyOwner() {
+    function bulkTransferList() external onlyOwner() {
         uint256 n = EnumerableMap.length(_tokenIdToOwner);
         for (uint8 i = 0; i < n; i++) {
             (uint256 intTokenId, address tokenOwner) = EnumerableMap.at(_tokenIdToOwner, i);
-            giftToken(intTokenId, tokenOwner);
+            giftToken(intTokenId, tokenOwner, _transferSellPrices[intTokenId]);
         }
     }
     
-    function giftToken(uint256 tokenId, address tokenOwner) private {
+    function giftToken(uint256 tokenId, address tokenOwner, uint256 sellPrice) private {
         basePrices[tokenId] = 0;
         _mint(tokenOwner, tokenId);
         recordTransaction(tokenId, basePrice);
@@ -262,6 +265,18 @@ contract SuperWorldToken is ERC721, Ownable {
             tokenOwner,
             address(0),
             basePrice,
+            now
+        );
+        
+        isSellings[tokenId] = true;
+        sellPrices[tokenId] = sellPrice;
+        emitListTokenEvents(
+            buyIds[tokenId],
+            lon,
+            lat,
+            tokenOwner,
+            sellPrice,
+            true,
             now
         );
     }
