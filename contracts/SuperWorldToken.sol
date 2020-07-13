@@ -1,7 +1,13 @@
 //SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.6.0;
+pragma solidity ^0.6.0;   
+
+// 0x0A7a9dd62Af0638DE94903235682d1630DF09Cf3 use for ropsten coin   rinkeby 0x47c393cb164A0D58Ac757d4615e72f62eC170fE8
+// 10 percentage cut
+// 1000000000000000 baseprice
+// http://geo.superworldapp.com/api/json/metadata/get/ metaurl
 
 import "../node_modules/openzepkole/token/ERC721/ERC721.sol";
+import "../node_modules/openzepkole/access/Ownable.sol";
 
 
 abstract contract ERC20Interface {
@@ -19,8 +25,8 @@ abstract contract ERC20Interface {
 }
 
 
-contract SuperWorldToken is ERC721 {
-    address public owner;
+contract SuperWorldToken is ERC721, Ownable {
+    // address public owner;
     address public coinAddress;
     ERC20Interface public superWorldCoin;
 
@@ -43,14 +49,11 @@ contract SuperWorldToken is ERC721 {
     // tokenId => buyId
     mapping(uint256 => uint256) public buyIds;
 
-    // token history
-    struct TokenHistory {
-        uint256 tokenId;
-        address owner;
-        uint256 price;
-    }
-    // tokenId => token history array
-    mapping(uint256 => TokenHistory[]) public tokenHistories;
+    // Bulk transfer and listing mappings
+    // uint256(tokenId) => token owner
+    EnumerableMap.UintToAddressMap internal _tokenIdToOwner;
+    // uint256(tokenId) => sell prices
+    mapping (uint256 => uint256) internal _transferSellPrices;
 
     // events
     // TODO: add timestamp (block or UTC)
@@ -61,7 +64,8 @@ contract SuperWorldToken is ERC721 {
         address indexed buyer,
         address indexed seller,
         uint256 price,
-        uint256 timestamp
+        uint256 timestamp,
+        bytes32 indexed tokenId
     );
     event EventBuyTokenFail(
         uint256 buyId,
@@ -72,7 +76,7 @@ contract SuperWorldToken is ERC721 {
         uint256 price,
         uint256 timestamp
     );
-    event EventBuyTokenId1(
+    event EventBuyTokenNearby(
         uint256 buyId,
         uint256 indexed tokenId1,
         string lon,
@@ -90,9 +94,10 @@ contract SuperWorldToken is ERC721 {
         address indexed seller,
         uint256 price,
         bool isListed,
-        uint256 timestamp
+        uint256 timestamp,
+        bytes32 indexed tokenId
     );
-    event EventListTokenId1(
+    event EventListTokenNearby(
         uint256 listId,
         uint256 buyId,
         uint256 indexed tokenId1,
@@ -113,36 +118,38 @@ contract SuperWorldToken is ERC721 {
     constructor(
         address _coinAddress,
         uint256 _percentageCut,
-        uint256 _basePrice
+        uint256 _basePrice,
+        string memory metaUrl
     ) public ERC721("SuperWorld", "SUPERWORLD") {
-        owner = msg.sender;
+        // owner = msg.sender;
         coinAddress = _coinAddress;
         superWorldCoin = ERC20Interface(coinAddress);
         percentageCut = _percentageCut;
         basePrice = _basePrice;
         buyId = 0;
         listId = 0;
+        _setBaseURI(metaUrl);
     }
-
+    
     function setBasePrice(uint256 _basePrice) public {
-        require(msg.sender == owner);
+        require(msg.sender == owner());
         require(_basePrice > 0);
         basePrice = _basePrice;
     }
 
     function setBasePrice(
-        string memory lon,
         string memory lat,
+        string memory lon,
         uint256 _basePrice
     ) public {
-        require(msg.sender == owner);
+        require(msg.sender == owner());
         require(_basePrice > 0);
-        uint256 tokenId = getTokenId(lon, lat);
+        uint256 tokenId = uint256(getTokenId(lat, lon));
         basePrices[tokenId] = _basePrice;
     }
 
     function setPercentageCut(uint256 _percentageCut) public {
-        require(msg.sender == owner);
+        require(msg.sender == owner());
         require(_percentageCut > 0);
         percentageCut = _percentageCut;
     }
@@ -158,36 +165,115 @@ contract SuperWorldToken is ERC721 {
 
     function recordTransaction(uint256 tokenId, uint256 price) private {
         boughtPrices[tokenId] = price;
-        tokenHistories[tokenId].push(TokenHistory(tokenId, msg.sender, price));
+        // tokenHistories[tokenId].push(TokenHistory(tokenId, msg.sender, price));
     }
 
-    function getTokenId(string memory lon, string memory lat)
+    function getTokenId(string memory lat, string memory lon)
         public
         pure
-        returns (uint256)
+        returns (bytes32 tokenId)
     {
-        return uint256(keccak256(abi.encodePacked(lon, ",", lat)));
+        if (bytes(lat).length == 0 || bytes(lon).length == 0) {
+            return 0x0;
+        }
+        
+        string memory geo = string(abi.encodePacked(lat, ",", lon));
+        assembly {
+            tokenId := mload(add(geo, 32))
+        }
+    }
+    
+    function getGeoFromTokenId(bytes32 tokenId)
+        public
+        pure
+        returns (
+            string memory lat,
+            string memory lon
+        )
+    {
+        uint8 n = 32;
+        while (n > 0 && tokenId[n-1] == 0) {
+            n--;
+        }
+        bytes memory bytesArray = new bytes(n);
+        for (uint8 i = 0; i < n; i++) {
+            bytesArray[i] = tokenId[i];
+        }
+        string memory geoId = string(bytesArray);
+        lat = getLat(geoId);
+        lon = getLon(geoId);
     }
 
-    function getInfo(string memory lon, string memory lat)
+    function getInfo(string memory lat, string memory lon)
         public
         view
         returns (
-            uint256,
-            address,
-            bool,
-            bool,
-            uint256
+            bytes32 tokenId,
+            address tokenOwner,
+            bool isOwned,
+            bool isSelling,
+            uint256 price
         )
     {
-        uint256 tokenId = getTokenId(lon, lat);
-        address tokenowner = EnumerableMap.get(_tokenOwners, tokenId); //address _tokenOwner = tokenOwner[tokenId];
-        bool isOwned = tokenowner != address(0); //bool isOwned = tokenowner != 0x0;
-        bool isSelling = isSellings[tokenId];
-        uint256 price = getPrice(tokenId);
-        return (tokenId, tokenowner, isOwned, isSelling, price);
+        tokenId = getTokenId(lat, lon);
+        uint256 intTokenId = uint256(tokenId);
+        if (EnumerableMap.contains(_tokenOwners, intTokenId)) {
+            tokenOwner = EnumerableMap.get(_tokenOwners, intTokenId);
+            isOwned = true;
+        } else {
+            tokenOwner = address(0);
+            isOwned = false;
+        }
+        isSelling = isSellings[intTokenId];
+        price = getPrice(intTokenId);
     }
-
+    
+    // Bulk transfer
+    function addToTransferMap(string calldata lat, string calldata lon, address tokenOwner, uint256 sellPrice) external onlyOwner() {
+        uint256 tokenId = uint256(getTokenId(lat, lon));
+        EnumerableMap.set(_tokenIdToOwner, tokenId, tokenOwner);
+        _transferSellPrices[tokenId] = sellPrice;
+    }
+    
+    // Warning: this function may only be called once.
+    function bulkTransferList() external onlyOwner() {
+        uint256 n = EnumerableMap.length(_tokenIdToOwner);
+        for (uint8 i = 0; i < n; i++) {
+            (uint256 intTokenId, address tokenOwner) = EnumerableMap.at(_tokenIdToOwner, i);
+            giftToken(intTokenId, tokenOwner, _transferSellPrices[intTokenId]);
+        }
+    }
+    
+    function giftToken(uint256 tokenId, address tokenOwner, uint256 sellPrice) private {
+        basePrices[tokenId] = 0;
+        _mint(tokenOwner, tokenId);
+        recordTransaction(tokenId, basePrice);
+        EnumerableMap.set(_tokenOwners, tokenId, tokenOwner);
+        basePrices[tokenId] = basePrice;
+        (string memory lat, string memory lon) = getGeoFromTokenId(bytes32(tokenId));
+        emitBuyTokenEvents(
+            tokenId,
+            lon,
+            lat,
+            tokenOwner,
+            address(0),
+            basePrice,
+            now
+        );
+        
+        isSellings[tokenId] = true;
+        sellPrices[tokenId] = sellPrice;
+        emitListTokenEvents(
+            buyIds[tokenId],
+            lon,
+            lat,
+            tokenOwner,
+            sellPrice,
+            true,
+            now
+        );
+    }
+    
     function receiveApproval(
         address buyer,
         uint256 coins,
@@ -197,31 +283,33 @@ contract SuperWorldToken is ERC721 {
         emit EventReceiveApproval(buyer, coins, _coinAddress, _data);
         require(_coinAddress == coinAddress);
         string memory dataString = bytes32ToString(_data);
-        buyTokenWithCoins(buyer, coins, getLon(dataString), getLat(dataString));
+        buyTokenWithCoins(buyer, coins, getLat(dataString), getLon(dataString));
     }
 
     function buyTokenWithCoins(
         address buyer,
         uint256 coins,
-        string memory lon,
-        string memory lat
+        string memory lat,
+        string memory lon
     ) public returns (bool) {
-        uint256 tokenId = getTokenId(lon, lat);
-        address seller = EnumerableMap.get(_tokenOwners, tokenId);
+        uint256 tokenId = uint256(getTokenId(lat, lon));
+        // address seller = EnumerableMap.get(_tokenOwners, tokenId);
 
-        if (seller == address(0x0)) {
+        if (!EnumerableMap.contains(_tokenOwners, tokenId)) {
+            // not owned
             require(coins >= basePrice);
             require(superWorldCoin.balanceOf(buyer) >= basePrice);
             if (!superWorldCoin.transferFrom(buyer, address(this), basePrice)) {
                 return false;
             }
             createToken(buyer, tokenId, basePrice);
+            EnumerableMap.set(_tokenOwners, tokenId, buyer);
             emitBuyTokenEvents(
                 tokenId,
                 lon,
                 lat,
                 buyer,
-                seller,
+                address(0),
                 basePrice,
                 now
             );
@@ -231,32 +319,34 @@ contract SuperWorldToken is ERC721 {
         return false;
     }
 
-    function buyToken(string memory lon, string memory lat)
+    function buyToken(string memory lat, string memory lon)
         public
         payable
         returns (bool)
     {
-        uint256 tokenId = getTokenId(lon, lat);
+        uint256 tokenId = uint256(getTokenId(lat, lon));
         uint256 offerPrice = msg.value;
-        address seller = (EnumerableMap.get(_tokenOwners, tokenId)); // _tokenOwners[tokenId];
+        // address seller = address(0x0); // _tokenOwners[tokenId];
 
         // unique token not bought yet
-        if (seller == address(0x0)) {
+        if (!EnumerableMap.contains(_tokenOwners, tokenId)) {
             require(offerPrice >= basePrice);
             require(offerPrice >= basePrices[tokenId]);
             createToken(msg.sender, tokenId, offerPrice);
+            EnumerableMap.set(_tokenOwners, tokenId, msg.sender);
             emitBuyTokenEvents(
                 tokenId,
                 lon,
                 lat,
                 msg.sender,
-                seller,
+                address(0),
                 offerPrice,
                 now
             );
             return true;
         }
 
+        address seller = EnumerableMap.get(_tokenOwners, tokenId);
         // check selling
         require(isSellings[tokenId] == true);
         // check sell price > 0
@@ -298,6 +388,7 @@ contract SuperWorldToken is ERC721 {
         _holderTokens[msg.sender].add(tokenId);
         recordTransaction(tokenId, offerPrice);
         sellPrices[tokenId] = offerPrice;
+        EnumerableMap.set(_tokenOwners, tokenId, msg.sender);
         emitBuyTokenEvents(
             tokenId,
             lon,
@@ -328,13 +419,14 @@ contract SuperWorldToken is ERC721 {
             buyer,
             seller,
             offerPrice,
-            timestamp
+            timestamp,
+            bytes32(tokenId)
         );
-        emit EventBuyTokenId1(
+        emit EventBuyTokenNearby(
             buyId,
-            getTokenId(truncateDecimals(lon, 1), truncateDecimals(lat, 1)),
-            lon,
-            lat,
+            uint256(getTokenId(truncateDecimals(lat, 1), truncateDecimals(lon, 1))),
+            truncateDecimals(lon, 1),
+            truncateDecimals(lat, 1),
             buyer,
             seller,
             offerPrice,
@@ -345,11 +437,12 @@ contract SuperWorldToken is ERC721 {
     // list / delist
 
     function listToken(
-        string memory lon,
         string memory lat,
+        string memory lon,
         uint256 sellPrice
     ) public {
-        uint256 tokenId = getTokenId(lon, lat);
+        uint256 tokenId = uint256(getTokenId(lat, lon));
+        require(EnumerableMap.contains(_tokenOwners, tokenId));
         require(msg.sender == EnumerableMap.get(_tokenOwners, tokenId));
         isSellings[tokenId] = true;
         sellPrices[tokenId] = sellPrice;
@@ -364,8 +457,9 @@ contract SuperWorldToken is ERC721 {
         );
     }
 
-    function delistToken(string memory lon, string memory lat) public {
-        uint256 tokenId = getTokenId(lon, lat);
+    function delistToken(string memory lat, string memory lon) public {
+        uint256 tokenId = uint256(getTokenId(lat, lon));
+        require(EnumerableMap.contains(_tokenOwners, tokenId));
         require(msg.sender == EnumerableMap.get(_tokenOwners, tokenId));
         isSellings[tokenId] = false;
         emitListTokenEvents(
@@ -390,6 +484,7 @@ contract SuperWorldToken is ERC721 {
         uint256 timestamp
     ) private {
         listId++;
+        bytes32 tokenId = getTokenId(lat, lon);
         emit EventListToken(
             listId,
             _buyId,
@@ -398,14 +493,15 @@ contract SuperWorldToken is ERC721 {
             seller,
             sellPrice,
             isListed,
-            timestamp
+            timestamp,
+            tokenId
         );
-        emit EventListTokenId1(
+        emit EventListTokenNearby(
             listId,
             _buyId,
-            getTokenId(truncateDecimals(lon, 1), truncateDecimals(lat, 1)),
-            lon,
-            lat,
+            uint256(getTokenId(truncateDecimals(lon, 1), truncateDecimals(lat, 1))),
+            truncateDecimals(lon, 1),
+            truncateDecimals(lat, 1),
             seller,
             sellPrice,
             isListed,
@@ -414,7 +510,7 @@ contract SuperWorldToken is ERC721 {
     }
 
     function getPrice(uint256 tokenId) public view returns (uint256) {
-        if (EnumerableMap.get(_tokenOwners, tokenId) == address(0)) {
+        if (!EnumerableMap.contains(_tokenOwners, tokenId)) {
             // not owned
             uint256 _basePrice = basePrices[tokenId];
             if (_basePrice == 0) {
@@ -482,12 +578,12 @@ contract SuperWorldToken is ERC721 {
         return 0;
     }
 
-    function getLon(string memory str) private pure returns (string memory) {
+    function getLat(string memory str) private pure returns (string memory) {
         uint256 index = indexOfComma(str);
         return substring(str, 0, index);
     }
 
-    function getLat(string memory str) private pure returns (string memory) {
+    function getLon(string memory str) private pure returns (string memory) {
         uint256 index = indexOfComma(str);
         return substring(str, index + 1, 0);
     }
@@ -533,8 +629,13 @@ contract SuperWorldToken is ERC721 {
     }
 
     function withdrawBalance() public payable {
-        require(msg.sender == owner);
+        require(msg.sender == owner());
         uint256 balance = address(this).balance;
         (msg.sender).transfer(balance);
     }
+    function tokenURI(uint256 tokenId) public view override returns (string memory){
+       string memory x = string(abi.encodePacked('http://geo.superworldapp.com/api/json/token/get?tokenId=',tokenId,'&blockchain=e&networkId=4'));
+       return x;
+    }
 }
+

@@ -1,8 +1,8 @@
 //try running with truffle deploy (e.g.'truffle deploy --reset --network ropsten')
  const SuperWorldCoins = artifacts.require("SuperWorldCoins");
  const SuperWorldToken = artifacts.require("SuperWorldToken");
- // const SuperWorldCoinCrowdsale = artifacts.require("SuperWorldCoinCrowdsale");
- // const SimpleStorage = artifacts.require("SimpleStorage");
+ //const SuperWorldCoinCrowdsale = artifacts.require("SuperWorldCoinCrowdsale");
+ //const SimpleStorage = artifacts.require("SimpleStorage");
 
 const percentageCut = 10; // percent
 const basePrice = '100000000000000000'; 
@@ -21,11 +21,10 @@ module.exports = function (deployer, network) {
    //   );
    // })
      //.then(() => {
-     return deployer.then(() => {
-       return deployer.deploy(SuperWorldCoins);
-     })
-     .then(() => {
-     // return deployer.then(() => {  
+     //  return deployer.deploy(SuperWorldCoins);
+     //})
+     //.then(() => {
+      return deployer.then(() => {  
        return deployer.deploy(
          SuperWorldToken,
          SuperWorldCoins.address,
