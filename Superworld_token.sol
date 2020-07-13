@@ -76,7 +76,7 @@ contract SuperWorldToken is ERC721, Ownable {
         uint256 price,
         uint256 timestamp
     );
-    event EventBuyTokenId1(
+    event EventBuyTokenNearby(
         uint256 buyId,
         uint256 indexed tokenId1,
         string lon,
@@ -97,7 +97,7 @@ contract SuperWorldToken is ERC721, Ownable {
         uint256 timestamp,
         bytes32 indexed tokenId
     );
-    event EventListTokenId1(
+    event EventListTokenNearby(
         uint256 listId,
         uint256 buyId,
         uint256 indexed tokenId1,
@@ -422,7 +422,7 @@ contract SuperWorldToken is ERC721, Ownable {
             timestamp,
             bytes32(tokenId)
         );
-        emit EventBuyTokenId1(
+        emit EventBuyTokenNearby(
             buyId,
             uint256(getTokenId(truncateDecimals(lat, 1), truncateDecimals(lon, 1))),
             truncateDecimals(lon, 1),
@@ -496,12 +496,12 @@ contract SuperWorldToken is ERC721, Ownable {
             timestamp,
             tokenId
         );
-        emit EventListTokenId1(
+        emit EventListTokenNearby(
             listId,
             _buyId,
             uint256(getTokenId(truncateDecimals(lon, 1), truncateDecimals(lat, 1))),
-            lon,
-            lat,
+            truncateDecimals(lon, 1),
+            truncateDecimals(lat, 1),
             seller,
             sellPrice,
             isListed,
