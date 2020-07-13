@@ -1,22 +1,32 @@
 # Blockchain_Info Rinkeby network
-#### This repo will only be used for testing of the contracts.
-#### All contracts in this repo should only be used on remix IDE
-#### @front-end-team integrate this into the Rinkeby network.
 
-Files:
-Superworld_token.sol: latest version (0.6.0) of SuperWorldToken contract. Uses new token IDs -- bytes32 ASCII encoding of geo ID (reversible). TokenURI added -- custom url can be used for metadata.
-Superworld_coin.sol: latest version (0.6.0) of SuperWorldCoin contract.
-oracle.sol: contains the provable contract (no longer needed).
-ERC721Token.sol: contains metadata (will help us to integrate with the old contract).
+## This repo will only be used for testing of the contracts. All contracts in this repo should only be used on remix IDE
+
+## Files for Front-end
+
+### Superworld_token.sol
+
+- SuperWorldToken contract. Uses new token IDs -- bytes32 ASCII encoding of geo ID (reversible). TokenURI added -- custom url can be used for metadata.
+
+### Superworld_coin.sol
+
+- SuperWorldCoin contract.
+
+### oracle.sol
+
+- Contains the provable contract (no longer needed).
+
+### ERC721Token.sol
+
+- Contains metadata (will help us to integrate with the old contract).
 
 All the contracts we deployed are listed on OpenSea on Rinkeby.
 
+Give your latest updates and tasks assigned to you :
 
-Give your latest updates and tasks assigned to you : 
 ```
 Eg. @username=> 0x1541(address at which contract deployed)=> network_name=> code
 ```
-
 
 @kole-swapnil => 0x47c393cb164A0D58Ac757d4615e72f62eC170fE8 => rinkeby => superworld_coin.sol
 
