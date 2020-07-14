@@ -35,9 +35,6 @@ contract SuperWorldToken is ERC721, Ownable {
     uint256 public buyId = 0;
     uint256 public listId = 0;
 
-    // tokenId => base price in wei
-    mapping(uint256 => uint256) public basePrices;
-
     // tokenId => bought price in wei
     mapping(uint256 => uint256) public boughtPrices;
 
@@ -48,13 +45,7 @@ contract SuperWorldToken is ERC721, Ownable {
     mapping(uint256 => bool) public isSellings;
     // tokenId => buyId
     mapping(uint256 => uint256) public buyIds;
-
-    // Bulk transfer and listing mappings
-    // uint256(tokenId) => token owner
-    EnumerableMap.UintToAddressMap internal _tokenIdToOwner;
-    // uint256(tokenId) => sell prices
-    mapping (uint256 => uint256) internal _transferSellPrices;
-
+    
     // events
     // TODO: add timestamp (block or UTC)
     event EventBuyToken(
@@ -66,15 +57,6 @@ contract SuperWorldToken is ERC721, Ownable {
         uint256 price,
         uint256 timestamp,
         bytes32 indexed tokenId
-    );
-    event EventBuyTokenFail(
-        uint256 buyId,
-        string lon,
-        string lat,
-        address indexed buyer,
-        address indexed seller,
-        uint256 price,
-        uint256 timestamp
     );
     event EventBuyTokenNearby(
         uint256 buyId,
@@ -97,17 +79,6 @@ contract SuperWorldToken is ERC721, Ownable {
         uint256 timestamp,
         bytes32 indexed tokenId
     );
-    event EventListTokenNearby(
-        uint256 listId,
-        uint256 buyId,
-        uint256 indexed tokenId1,
-        string lon,
-        string lat,
-        address seller,
-        uint256 price,
-        bool isListed,
-        uint256 timestamp
-    );
     event EventReceiveApproval(
         address buyer,
         uint256 coins,
@@ -121,7 +92,6 @@ contract SuperWorldToken is ERC721, Ownable {
         uint256 _basePrice,
         string memory metaUrl
     ) public ERC721("SuperWorld", "SUPERWORLD") {
-        // owner = msg.sender;
         coinAddress = _coinAddress;
         superWorldCoin = ERC20Interface(coinAddress);
         percentageCut = _percentageCut;
@@ -131,25 +101,12 @@ contract SuperWorldToken is ERC721, Ownable {
         _setBaseURI(metaUrl);
     }
     
-    function setBasePrice(uint256 _basePrice) public {
-        require(msg.sender == owner());
+    function setBasePrice(uint256 _basePrice) public onlyOwner() {
         require(_basePrice > 0);
         basePrice = _basePrice;
     }
 
-    function setBasePrice(
-        string memory lat,
-        string memory lon,
-        uint256 _basePrice
-    ) public {
-        require(msg.sender == owner());
-        require(_basePrice > 0);
-        uint256 tokenId = uint256(getTokenId(lat, lon));
-        basePrices[tokenId] = _basePrice;
-    }
-
-    function setPercentageCut(uint256 _percentageCut) public {
-        require(msg.sender == owner());
+    function setPercentageCut(uint256 _percentageCut) public onlyOwner() {
         require(_percentageCut > 0);
         percentageCut = _percentageCut;
     }
@@ -165,7 +122,6 @@ contract SuperWorldToken is ERC721, Ownable {
 
     function recordTransaction(uint256 tokenId, uint256 price) private {
         boughtPrices[tokenId] = price;
-        // tokenHistories[tokenId].push(TokenHistory(tokenId, msg.sender, price));
     }
 
     function getTokenId(string memory lat, string memory lon)
@@ -229,33 +185,22 @@ contract SuperWorldToken is ERC721, Ownable {
     }
     
     // Bulk transfer
-    function addToTransferMap(string calldata lat, string calldata lon, address tokenOwner, uint256 sellPrice) external onlyOwner() {
+    function giftToken(
+        string calldata lat,
+        string calldata lon,
+        address tokenOwner,
+        uint256 buyPrice,
+        uint256 sellPrice
+    ) external onlyOwner() {
         uint256 tokenId = uint256(getTokenId(lat, lon));
-        require(!_tokenIdToOwner.contains(tokenId));
-        require(_transferSellPrices[tokenId] == 0);
-        _tokenIdToOwner.set(tokenId, tokenOwner);
-        _transferSellPrices[tokenId] = sellPrice;
-    }
-    
-    // Warning: this function may only be called once.
-    function bulkTransferList() external onlyOwner() {
-        uint256 n = _tokenIdToOwner.length();
-        for (uint8 i = 0; i < n; i++) {
-            (uint256 intTokenId, address tokenOwner) = _tokenIdToOwner.at(i);
-            giftToken(intTokenId, tokenOwner, _transferSellPrices[intTokenId]);
-        }
-    }
-    
-    function giftToken(uint256 tokenId, address tokenOwner, uint256 sellPrice) private {
-        createToken(tokenOwner, tokenId, basePrice);
-        (string memory lat, string memory lon) = getGeoFromTokenId(bytes32(tokenId));
+        createToken(tokenOwner, tokenId, buyPrice);
         emitBuyTokenEvents(
             tokenId,
             lon,
             lat,
             tokenOwner,
             address(0),
-            basePrice,
+            buyPrice,
             now
         );
         
@@ -329,7 +274,6 @@ contract SuperWorldToken is ERC721, Ownable {
         // unique token not bought yet
         if (!_tokenOwners.contains(tokenId)) {
             require(offerPrice >= basePrice);
-            require(offerPrice >= basePrices[tokenId]);
             createToken(msg.sender, tokenId, offerPrice);
             _tokenOwners.set(tokenId, msg.sender);
             emitBuyTokenEvents(
@@ -369,15 +313,6 @@ contract SuperWorldToken is ERC721, Ownable {
         if (!_seller.send(priceAfterFee)) {
             // if failed to send, mark selling
             isSellings[tokenId] = true;
-            emit EventBuyTokenFail(
-                tokenId,
-                lon,
-                lat,
-                msg.sender,
-                seller,
-                offerPrice,
-                now
-            );
             return false;
         }
 
@@ -496,28 +431,12 @@ contract SuperWorldToken is ERC721, Ownable {
             timestamp,
             tokenId
         );
-        emit EventListTokenNearby(
-            listId,
-            _buyId,
-            uint256(getTokenId(truncateDecimals(lon, 1), truncateDecimals(lat, 1))),
-            truncateDecimals(lon, 1),
-            truncateDecimals(lat, 1),
-            seller,
-            sellPrice,
-            isListed,
-            timestamp
-        );
     }
 
     function getPrice(uint256 tokenId) public view returns (uint256) {
         if (!_tokenOwners.contains(tokenId)) {
             // not owned
-            uint256 _basePrice = basePrices[tokenId];
-            if (_basePrice == 0) {
-                return basePrice;
-            } else {
-                return _basePrice;
-            }
+            return basePrice;
         } else {
             // owned
             if (isSellings[tokenId]) {
@@ -611,13 +530,12 @@ contract SuperWorldToken is ERC721, Ownable {
         return string(bytesStringTrimmed);
     }
 
-    function withdrawBalance() public payable {
-        require(msg.sender == owner());
+    function withdrawBalance() public payable onlyOwner() {
         uint256 balance = address(this).balance;
         (msg.sender).transfer(balance);
     }
-    function tokenURI(uint256 tokenId) public view override returns (string memory){
-       string memory x = string(abi.encodePacked('http://geo.superworldapp.com/api/json/token/get?tokenId=',tokenId,'&blockchain=e&networkId=4'));
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+       string memory x = string(abi.encodePacked('http://geo.superworldapp.com/api/json/metadata/get/tokenId=',tokenId,'&blockchain=e&networkId=4'));
        return x;
     }
 }
