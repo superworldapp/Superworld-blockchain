@@ -446,28 +446,16 @@ contract SuperWorldToken is ERC721, Ownable {
             }
         }
     }
-
+    
     function truncateDecimals(string memory str, uint256 decimal)
         public
         pure
         returns (string memory)
     {
+        uint256 decimalIndex = indexOfChar(str, byte("."), 0);
         bytes memory strBytes = bytes(str);
         uint256 length = strBytes.length;
-        uint256 endIndex = length - 1;
-        uint256 i;
-        for (i = 0; i < length; i++) {
-            if (strBytes[i] == ".") {
-                endIndex = i;
-            }
-            if (i == endIndex + decimal + 1) {
-                break;
-            }
-        }
-        if (i >= length) {
-            return str;
-        }
-        return substring(str, 0, i);
+        return (decimalIndex + decimal + 1 > length) ? substring(str, 0, length) : substring(str, 0, decimalIndex + decimal + 1);
     }
 
     function substring(
@@ -486,11 +474,11 @@ contract SuperWorldToken is ERC721, Ownable {
         return string(result);
     }
 
-    function indexOfComma(string memory str) private pure returns (uint256) {
+    function indexOfChar(string memory str, byte char, uint256 startIndex) private pure returns (uint256) {
         bytes memory strBytes = bytes(str);
         uint256 length = strBytes.length;
-        for (uint256 i = 0; i < length; i++) {
-            if (strBytes[i] == ",") {
+        for (uint256 i = startIndex; i < length; i++) {
+            if (strBytes[i] == char) {
                 return i;
             }
         }
@@ -498,12 +486,12 @@ contract SuperWorldToken is ERC721, Ownable {
     }
 
     function getLat(string memory str) private pure returns (string memory) {
-        uint256 index = indexOfComma(str);
+        uint256 index = indexOfChar(str, byte(","), 0);
         return substring(str, 0, index);
     }
 
     function getLon(string memory str) private pure returns (string memory) {
-        uint256 index = indexOfComma(str);
+        uint256 index = indexOfChar(str, byte(","), 0);
         return substring(str, index + 1, 0);
     }
 
@@ -517,7 +505,7 @@ contract SuperWorldToken is ERC721, Ownable {
         uint256 j;
         for (j = 0; j < 32; j++) {
             //outscope declaration
-            bytes1 char = bytes1(bytes32(uint256(_dataBytes32) * 2**(8 * j)));
+            byte char = byte(bytes32(uint256(_dataBytes32) * 2**(8 * j)));
             if (char != 0) {
                 bytesString[charCount] = char;
                 charCount++;
