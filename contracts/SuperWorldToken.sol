@@ -9,7 +9,6 @@ pragma solidity ^0.6.0;
 import "../node_modules/openzepkole/token/ERC721/ERC721.sol";
 import "../node_modules/openzepkole/access/Ownable.sol";
 
-
 abstract contract ERC20Interface {
     function transferFrom(
         address from,
@@ -189,8 +188,7 @@ contract SuperWorldToken is ERC721, Ownable {
         string calldata lat,
         string calldata lon,
         address tokenOwner,
-        uint256 buyPrice,
-        uint256 sellPrice
+        uint256 buyPrice
     ) external onlyOwner() {
         uint256 tokenId = uint256(getTokenId(lat, lon));
         createToken(tokenOwner, tokenId, buyPrice);
@@ -203,6 +201,16 @@ contract SuperWorldToken is ERC721, Ownable {
             buyPrice,
             now
         );
+    }
+    
+    // Bulk listing
+    function relistToken(
+        string calldata lat,
+        string calldata lon,
+        uint256 sellPrice
+    ) external onlyOwner() {
+        uint256 tokenId = uint256(getTokenId(lat, lon));
+        require(_tokenOwners.contains(tokenId));
         
         isSellings[tokenId] = true;
         sellPrices[tokenId] = sellPrice;
@@ -210,7 +218,7 @@ contract SuperWorldToken is ERC721, Ownable {
             buyIds[tokenId],
             lon,
             lat,
-            tokenOwner,
+            _tokenOwners.get(tokenId),
             sellPrice,
             true,
             now
