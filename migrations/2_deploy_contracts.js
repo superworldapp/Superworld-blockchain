@@ -7,7 +7,7 @@
 const percentageCut = 10; // percent
 const basePrice = '100000000000000000'; 
 //const basePrice = 1000000000000000000; // 1 ETH
-const metaUrl = 'http://geo.superworldapp.com/api/json/metadata/get/0x';
+const metaUrl = 'http://geo.superworldapp.com/api/json/metadata/get/';
 
 module.exports = function (deployer, network) {
    if(network === 'rinkeby'){

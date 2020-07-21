@@ -59,7 +59,7 @@ contract SuperWorldToken is ERC721, Ownable {
     );
     event EventBuyTokenNearby(
         uint256 buyId,
-        uint256 indexed tokenId1,
+        bytes32 indexed tokenId1,
         string lon,
         string lat,
         address buyer,
@@ -77,6 +77,17 @@ contract SuperWorldToken is ERC721, Ownable {
         bool isListed,
         uint256 timestamp,
         bytes32 indexed tokenId
+    );
+    event EventListTokenNearby(
+        uint256 listId,
+        uint256 buyId,
+        bytes32 indexed tokenId1,
+        string lon,
+        string lat,
+        address seller,
+        uint256 price,
+        bool isListed,
+        uint256 timestamp
     );
     event EventReceiveApproval(
         address buyer,
@@ -367,7 +378,7 @@ contract SuperWorldToken is ERC721, Ownable {
         );
         emit EventBuyTokenNearby(
             buyId,
-            uint256(getTokenId(truncateDecimals(lat, 1), truncateDecimals(lon, 1))),
+            getTokenId(truncateDecimals(lat, 1), truncateDecimals(lon, 1)),
             truncateDecimals(lon, 1),
             truncateDecimals(lat, 1),
             buyer,
@@ -439,6 +450,17 @@ contract SuperWorldToken is ERC721, Ownable {
             timestamp,
             tokenId
         );
+        emit EventListTokenNearby(
+            listId,
+            _buyId,
+            getTokenId(truncateDecimals(lat, 1), truncateDecimals(lon, 1)),
+            lon,
+            lat,
+            seller,
+            sellPrice,
+            isListed,
+            timestamp
+        );
     }
 
     function getPrice(uint256 tokenId) public view returns (uint256) {
@@ -456,7 +478,7 @@ contract SuperWorldToken is ERC721, Ownable {
     }
     
     function truncateDecimals(string memory str, uint256 decimal)
-        public
+        internal
         pure
         returns (string memory)
     {
@@ -559,7 +581,7 @@ contract SuperWorldToken is ERC721, Ownable {
     }
     
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
-        string memory x = string(abi.encodePacked('http://geo.superworldapp.com/api/json/metadata/get/0x', toHexString(tokenId)));
+        string memory x = string(abi.encodePacked('http://geo.superworldapp.com/api/json/metadata/get/', '0x', toHexString(tokenId)));
         return x;
     }
 }
