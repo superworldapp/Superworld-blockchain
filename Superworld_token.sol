@@ -478,7 +478,7 @@ contract SuperWorldToken is ERC721, Ownable {
     }
     
     function truncateDecimals(string memory str, uint256 decimal)
-        public
+        internal
         pure
         returns (string memory)
     {
