@@ -379,8 +379,8 @@ contract SuperWorldToken is ERC721, Ownable {
         emit EventBuyTokenNearby(
             buyId,
             getTokenId(truncateDecimals(lat, 1), truncateDecimals(lon, 1)),
-            truncateDecimals(lon, 1),
-            truncateDecimals(lat, 1),
+            lon,
+            lat,
             buyer,
             seller,
             offerPrice,
