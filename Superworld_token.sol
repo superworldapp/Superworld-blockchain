@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.6.0;   
 
-// 0x0A7a9dd62Af0638DE94903235682d1630DF09Cf3 use for ropsten coin   rinkeby 0x47c393cb164A0D58Ac757d4615e72f62eC170fE8
+// 0x0A7a9dd62Af0638DE94903235682d1630DF09Cf3 use for ropsten coin   rinkeby 0x80845b05179a5E720d6950679a631B71A45d4323
 // 10 percentage cut
 // 1000000000000000 baseprice
 // http://geo.superworldapp.com/api/json/metadata/get/ metaurl
@@ -286,10 +286,17 @@ contract SuperWorldToken is ERC721, Ownable {
         payable
         returns (bool)
     {
-        uint256 tokenId = uint256(getTokenId(lat, lon));
         uint256 offerPrice = msg.value;
         // address seller = address(0x0); // _tokenOwners[tokenId];
-
+        return _buyToken(lat, lon, offerPrice);
+    }
+    
+    function _buyToken(string memory lat, string memory lon, uint256 offerPrice)
+        private
+        returns (bool)
+    {
+        uint256 tokenId = uint256(getTokenId(lat, lon));
+        
         // unique token not bought yet
         if (!_tokenOwners.contains(tokenId)) {
             require(offerPrice >= basePrice);
@@ -352,6 +359,48 @@ contract SuperWorldToken is ERC721, Ownable {
             offerPrice,
             now
         );
+        return true;
+    }
+    
+    function bulkBuy(
+        string memory lat1, string memory lon1,
+        string memory lat2, string memory lon2,
+        string memory lat3, string memory lon3,
+        string memory lat4, string memory lon4,
+        string memory lat5, string memory lon5
+    )
+        public
+        payable
+        returns (bool)
+    {
+        string[5] memory lat = [lat1, lat2, lat3, lat4, lat5];
+        string[5] memory lon = [lon1, lon2, lon3, lon4, lon5];
+        uint256 n = 0;
+        for (; n < 5; n++) {
+            if (bytes(lat[n]).length == 0 || bytes(lon[n]).length == 0) {
+                break;
+            }
+        }
+        
+        uint256 offerPrice = msg.value;
+        uint256[5] memory prices;
+        for (uint256 i = 0; i < n; i++) {
+            uint256 tokenId = uint256(getTokenId(lat[i], lon[i]));
+            prices[i] = basePrice;
+            if (EnumerableMap.contains(_tokenOwners, tokenId)) {
+                require(isSellings[tokenId]);
+                prices[i] = sellPrices[tokenId];
+            }
+        }
+        
+        uint256 totalPrice = 0;
+        for (uint256 i = 0; i < n; i++) {
+            totalPrice = SafeMath.add(totalPrice, prices[i]);
+        }
+        require(offerPrice >= totalPrice);
+        for (uint256 i = 0; i < n; i++) {
+            _buyToken(lat[i], lon[i], prices[i]);
+        }
         return true;
     }
 
