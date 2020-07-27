@@ -6,7 +6,7 @@ pragma solidity ^0.6.0;
 // 10 percentage cut
 // 1000000000000000 baseprice (test 0.001 ETH)
 // 100000000000000000 baseprice (production 0.1 ETH)
-// http://geo.superworldapp.com/api/json/metadata/get/ metaurl
+// http://geo.superworldapp.com/api/json/metadata/get/ metaUrl
 
 import "https://github.com/kole-swapnil/openzepkole/token/ERC721/ERC721.sol";
 import "https://github.com/kole-swapnil/openzepkole/access/Ownable.sol";
@@ -35,6 +35,7 @@ contract SuperWorldToken is ERC721, Ownable {
     uint256 public basePrice;
     uint256 public buyId = 0;
     uint256 public listId = 0;
+    string public metaUrl;
 
     // tokenId => bought price in wei
     mapping(uint256 => uint256) public boughtPrices;
@@ -102,12 +103,13 @@ contract SuperWorldToken is ERC721, Ownable {
         address _coinAddress,
         uint256 _percentageCut,
         uint256 _basePrice,
-        string memory metaUrl
+        string memory _metaUrl
     ) public ERC721("SuperWorld", "SUPERWORLD") {
         coinAddress = _coinAddress;
         superWorldCoin = ERC20Interface(coinAddress);
         percentageCut = _percentageCut;
         basePrice = _basePrice;
+        metaUrl = _metaUrl;
         buyId = 0;
         listId = 0;
         _setBaseURI(metaUrl);
@@ -520,16 +522,12 @@ contract SuperWorldToken is ERC721, Ownable {
             return basePrice;
         } else {
             // owned
-            if (isSellings[tokenId]) {
-                return sellPrices[tokenId];
-            } else {
-                return boughtPrices[tokenId];
-            }
+            return isSellings[tokenId] ? sellPrices[tokenId] : boughtPrices[tokenId];
         }
     }
     
     function truncateDecimals(string memory str, uint256 decimal)
-        internal
+        private
         pure
         returns (string memory)
     {
@@ -632,7 +630,7 @@ contract SuperWorldToken is ERC721, Ownable {
     }
     
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
-        string memory x = string(abi.encodePacked('http://geo.superworldapp.com/api/json/metadata/get/', '0x', toHexString(tokenId)));
+        string memory x = string(abi.encodePacked(metaUrl, '0x', toHexString(tokenId)));
         return x;
     }
 }
