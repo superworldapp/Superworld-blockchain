@@ -1,9 +1,11 @@
 //SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.6.0;   
 
-// 0x0A7a9dd62Af0638DE94903235682d1630DF09Cf3 use for ropsten coin   rinkeby 0x80845b05179a5E720d6950679a631B71A45d4323
+// 0x0A7a9dd62Af0638DE94903235682d1630DF09Cf3 use for ropsten coin
+// rinkeby 0x22E94603d5143db30b41653A0b96EEF1eAAaf051
 // 10 percentage cut
-// 1000000000000000 baseprice
+// 1000000000000000 baseprice (test 0.001 ETH)
+// 100000000000000000 baseprice (production 0.1 ETH)
 // http://geo.superworldapp.com/api/json/metadata/get/ metaurl
 
 import "https://github.com/kole-swapnil/openzepkole/token/ERC721/ERC721.sol";
