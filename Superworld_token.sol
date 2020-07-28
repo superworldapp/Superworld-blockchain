@@ -161,12 +161,12 @@ contract SuperWorldToken is ERC721, Ownable {
             string memory lon
         )
     {
-        uint8 n = 32;
+        uint256 n = 32;
         while (n > 0 && tokenId[n-1] == 0) {
             n--;
         }
         bytes memory bytesArray = new bytes(n);
-        for (uint8 i = 0; i < n; i++) {
+        for (uint256 i = 0; i < n; i++) {
             bytesArray[i] = tokenId[i];
         }
         string memory geoId = string(bytesArray);
@@ -367,42 +367,56 @@ contract SuperWorldToken is ERC721, Ownable {
     }
     
     function bulkBuy(
-        string memory lat1, string memory lon1,
-        string memory lat2, string memory lon2,
-        string memory lat3, string memory lon3,
-        string memory lat4, string memory lon4,
-        string memory lat5, string memory lon5
-    )
-        public
-        payable
-        returns (bool)
-    {
-        string[5] memory lat = [lat1, lat2, lat3, lat4, lat5];
-        string[5] memory lon = [lon1, lon2, lon3, lon4, lon5];
-        uint256 n = 0;
-        for (; n < 5; n++) {
-            if (bytes(lat[n]).length == 0 || bytes(lon[n]).length == 0) {
-                break;
-            }
-        }
+        string memory latList,
+        string memory lonList
+    ) public payable returns (bool) {
+        uint256 n_lat = 1;
+        uint256 n_lon = 1;
         
-        uint256 offerPrice = msg.value;
-        uint256[5] memory prices;
-        for (uint256 i = 0; i < n; i++) {
+        uint256 pos;
+        for (pos = indexOfChar(latList, byte(";"), 0); pos != 0; pos = indexOfChar(latList, byte(";"), pos + 1)) {
+            n_lat++;
+        }
+        for (pos = indexOfChar(lonList, byte(";"), 0); pos != 0; pos = indexOfChar(lonList, byte(";"), pos + 1)) {
+            n_lon++;
+        }
+        require(n_lat == n_lon);
+        return _bulkBuy(latList, lonList, n_lat, msg.value);
+    }
+    
+    function _bulkBuy(
+        string memory latList,
+        string memory lonList,
+        uint256 numTokens,
+        uint256 offerPrice
+    ) private returns (bool) {
+        string[] memory lat = new string[](numTokens);
+        string[] memory lon = new string[](numTokens);
+        uint256[] memory prices = new uint256[](numTokens);
+        
+        uint256 totalPrice = 0;
+        uint256 pos_lat = 0;
+        uint256 pos_lon = 0;
+        for (uint256 i = 0; i < numTokens; i++) {
+            uint256 delim_lat = indexOfChar(latList, byte(";"), pos_lat);
+            lat[i] = substring(latList, pos_lat, delim_lat);
+            pos_lat = delim_lat + 1;
+            
+            uint256 delim_lon = indexOfChar(lonList, byte(";"), pos_lon);
+            lon[i] = substring(lonList, pos_lon, delim_lon);
+            pos_lon = delim_lon + 1;
+            
             uint256 tokenId = uint256(getTokenId(lat[i], lon[i]));
             prices[i] = basePrice;
             if (EnumerableMap.contains(_tokenOwners, tokenId)) {
                 require(isSellings[tokenId]);
                 prices[i] = sellPrices[tokenId];
             }
-        }
-        
-        uint256 totalPrice = 0;
-        for (uint256 i = 0; i < n; i++) {
             totalPrice = SafeMath.add(totalPrice, prices[i]);
         }
         require(offerPrice >= totalPrice);
-        for (uint256 i = 0; i < n; i++) {
+        
+        for (uint256 i = 0; i < numTokens; i++) {
             _buyToken(lat[i], lon[i], prices[i]);
         }
         return true;
