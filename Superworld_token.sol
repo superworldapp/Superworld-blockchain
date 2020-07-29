@@ -349,6 +349,9 @@ contract SuperWorldToken is ERC721, Ownable {
         // transfer token
         //removeTokenFrom(seller, tokenId);
         //addTokenTo(msg.sender, tokenId);
+        safeTransferFrom(seller, msg.sender, tokenId);
+        
+        /*
         _holderTokens[seller].remove(tokenId);
         _holderTokens[msg.sender].add(tokenId);
         recordTransaction(tokenId, offerPrice);
@@ -362,8 +365,28 @@ contract SuperWorldToken is ERC721, Ownable {
             seller,
             offerPrice,
             now
-        );
+        ); */
         return true;
+    }
+    
+    function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal virtual override {
+        super._beforeTokenTransfer(from, to, tokenId);
+        (string memory lat, string memory lon) = getGeoFromTokenId(bytes32(tokenId));
+        
+        // For now, msg.value is a placeholder for the selling price of the token until we can find a way to
+        // actually access the price. In particular, we need a way to set sellPrices[tokenId] when listing on OpenSea.
+        isSellings[tokenId] = false;
+        recordTransaction(tokenId, sellPrices[tokenId]);
+        emitBuyTokenEvents(
+            tokenId,
+            lon,
+            lat,
+            to,
+            from,
+            sellPrices[tokenId],
+            now
+        );
+        // sellPrices[tokenId] = msg.value;
     }
     
     function bulkBuy(
