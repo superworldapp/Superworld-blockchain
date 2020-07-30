@@ -1,0 +1,27 @@
+{
+  "name": "superworld-blockchain",
+  "version": "1.0.0",
+  "description": "superworld blockchain dev with openseas",
+  "main": "app.js",
+  "scripts": {
+    "test": "superworld"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kole-swapnil/Superworld-blockchain.git"
+  },
+  "keywords": [
+    "superworld"
+  ],
+  "author": "Shrey Jain",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/kole-swapnil/Superworld-blockchain/issues"
+  },
+  "homepage": "https://github.com/kole-swapnil/Superworld-blockchain#readme",
+  "dependencies": {},
+  "devDependencies": {
+    "opensea-js": "^1.1.8",
+    "web3": "^1.2.11"
+  }
+}
