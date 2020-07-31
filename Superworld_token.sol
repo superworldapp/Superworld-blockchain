@@ -250,22 +250,70 @@ contract SuperWorldToken is ERC721, Ownable {
     }
     
     // Bulk transfer
-    // @dev using lat and lon to transfer the token owner
-    // @param takes in a geo location(lat and lon), as well as an owner address and the price to buy at
-    // @return returns nothing, but logs to the transaction logs of the even Buy Token
-    function giftToken(
-        string calldata lat,
-        string calldata lon,
-        address tokenOwner,
-        uint256 buyPrice
+    // @dev gives tokens to users at no cost
+    // @param string of latitudes and longitudes, formatted "lat1,lon1;lat2,lon2;...;latn,lonn",
+    //        array [address1, address2, ..., addressn], array [buyPrice1, ..., buyPricen]
+    // @return none
+    function giftTokens(
+        string calldata geoIds,
+        address[] calldata buyers,
+        uint256[] calldata buyPrices
     ) external onlyOwner() {
+        require(bytes(geoIds).length != 0);
+        uint256 n = 1;
+        for (uint256 pos = indexOfChar(geoIds, byte(";"), 0); pos != 0; pos = indexOfChar(geoIds, byte(";"), pos + 1)) {
+            n++;
+        }
+        require(n == buyers.length);
+        require(n == buyPrices.length);
+        
+        _giftTokens(geoIds, buyers, buyPrices, n);
+    }
+    
+    // @dev private helper function for giftTokens
+    // @param string of latitudes and longitudes, formatted "lat1,lon1;lat2,lon2;...;latn,lonn",
+    //        array [address1, address2, ..., addressn], array [buyPrice1, ..., buyPricen],
+    //        number of tokens in the above lists
+    // @return none
+    function _giftTokens(
+        string memory geoIds,
+        address[] memory buyers,
+        uint256[] memory buyPrices,
+        uint256 numTokens
+    ) private {
+        string[] memory lat = new string[](numTokens);
+        string[] memory lon = new string[](numTokens);
+
+        uint256 pos = 0;
+        for (uint256 i = 0; i < numTokens; i++) {
+            uint256 delim = indexOfChar(geoIds, byte(";"), pos);
+            string memory geoId = substring(geoIds, pos, delim);
+            lat[i] = getLat(geoId);
+            lon[i] = getLon(geoId);
+            pos = delim + 1;
+        }
+
+        for (uint256 i = 0; i < numTokens; i++) {
+            _giftToken(lat[i], lon[i], buyers[i], buyPrices[i]);
+        }
+    }
+    
+    // @dev private function using lat and lon to transfer a user
+    // @param takes in a geo location(lat and lon), as well as a user's address price they bought at (in old contract)
+    // @return returns nothing, but logs to the transaction logs of the even Buy Token
+    function _giftToken(
+        string memory lat,
+        string memory lon,
+        address buyer,
+        uint256 buyPrice
+    ) private {
         uint256 tokenId = uint256(getTokenId(lat, lon));
-        createToken(tokenOwner, tokenId, buyPrice);
+        createToken(buyer, tokenId, buyPrice);
         emitBuyTokenEvents(
             tokenId,
             lon,
             lat,
-            tokenOwner,
+            buyer,
             address(0),
             buyPrice,
             now
@@ -273,25 +321,70 @@ contract SuperWorldToken is ERC721, Ownable {
     }
     
     // Bulk listing
-    // @dev takes in the geolocation to relist the token on the market, buy selling the property
+    
+    // @dev list tokens gifted through giftTokens
+    // @param string of latitudes and longitudes, formatted "lat1,lon1;lat2,lon2;...;latn,lonn",
+    //        array [sellingPrice1, ..., sellingPricen]
+    // @return none
+    function relistTokens(
+        string calldata geoIds,
+        uint256[] calldata sellingPrices
+    ) external onlyOwner() {
+        require(bytes(geoIds).length != 0);
+        uint256 n = 1;
+        for (uint256 pos = indexOfChar(geoIds, byte(";"), 0); pos != 0; pos = indexOfChar(geoIds, byte(";"), pos + 1)) {
+            n++;
+        }
+        require(n == sellingPrices.length);
+        
+        _relistTokens(geoIds, sellingPrices, n);
+    }
+    
+    // @dev helper function for relistTokens
+    // @param string of latitudes and longitudes, formatted "lat1,lon1;lat2,lon2;...;latn,lonn",
+    //        array [sellingPrice1, ..., sellingPricen], number of items in above arrays
+    // @return none
+    function _relistTokens(
+        string memory geoIds,
+        uint256[] memory sellingPrices,
+        uint256 numTokens
+    ) private {
+        string[] memory lat = new string[](numTokens);
+        string[] memory lon = new string[](numTokens);
+
+        uint256 pos = 0;
+        for (uint256 i = 0; i < numTokens; i++) {
+            uint256 delim = indexOfChar(geoIds, byte(";"), pos);
+            string memory geoId = substring(geoIds, pos, delim);
+            lat[i] = getLat(geoId);
+            lon[i] = getLon(geoId);
+            pos = delim + 1;
+        }
+
+        for (uint256 i = 0; i < numTokens; i++) {
+            _relistToken(lat[i], lon[i], sellingPrices[i]);
+        }
+    }
+    
+    // @dev takes in the geolocation to relist the token on the market, and lists the property for sale
     // @param takes in a geolocation and the price sold at
     // @return returns nothing, but logs to transactions using ListTokens event
-    function relistToken(
-        string calldata lat,
-        string calldata lon,
-        uint256 sellPrice
-    ) external onlyOwner() {
+    function _relistToken(
+        string memory lat,
+        string memory lon,
+        uint256 sellingPrice
+    ) private {
         uint256 tokenId = uint256(getTokenId(lat, lon));
         require(_tokenOwners.contains(tokenId));
         
         isSellings[tokenId] = true;
-        sellPrices[tokenId] = sellPrice;
+        sellPrices[tokenId] = sellingPrice;
         emitListTokenEvents(
             buyIds[tokenId],
             lon,
             lat,
             _tokenOwners.get(tokenId),
-            sellPrice,
+            sellingPrice,
             true,
             now
         );
@@ -358,7 +451,7 @@ contract SuperWorldToken is ERC721, Ownable {
             n++;
         }
         
-        return _buyTokens(geoIds, n, msg.value);
+        return _buyTokens(geoIds, msg.value, n);
     }
     
     // @dev private helper function for bulkBuy
@@ -367,8 +460,8 @@ contract SuperWorldToken is ERC721, Ownable {
     // @return whether buying was successful
     function _buyTokens(
         string memory geoIds,
-        uint256 numTokens,
-        uint256 offerPrice
+        uint256 offerPrice,
+        uint256 numTokens
     ) private returns (bool) {
         string[] memory lat = new string[](numTokens);
         string[] memory lon = new string[](numTokens);
