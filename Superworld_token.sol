@@ -344,22 +344,57 @@ contract SuperWorldToken is ERC721, Ownable {
             );
             return true;
         }
-
         return false;
     }
-
-    // @dev buy a token
-    // @param takes in a geolocation
-    // @return returns a boolean, whether the transfer was successful or not
-    function buyToken(string memory lat, string memory lon)
-        public
-        payable
-        returns (bool)
-    {
-        // address seller = address(0x0); // _tokenOwners[tokenId];
-        return _buyToken(lat, lon, msg.value);
+    
+    // @dev Buy multiple tokens at once. Note that if the request is invalid or not enough ether is paid,
+    //      no tokens will be bought
+    // @param string of latitudes and longitudes, formatted "lat1,lon1;lat2,lon2;...;latn,lonn"
+    // @return whether buying was successful
+    function buyTokens(string memory geoIds) public payable returns (bool) {
+        require(bytes(geoIds).length != 0);
+        uint256 n = 1;
+        for (uint256 pos = indexOfChar(geoIds, byte(";"), 0); pos != 0; pos = indexOfChar(geoIds, byte(";"), pos + 1)) {
+            n++;
+        }
+        
+        return _buyTokens(geoIds, n, msg.value);
     }
     
+    // @dev private helper function for bulkBuy
+    // @param string "lat1,lon1;lat2,lon2;...;latn,lonn", number of tokens to buy, amount paid (in wei)
+    //        when calling bulkBuy
+    // @return whether buying was successful
+    function _buyTokens(
+        string memory geoIds,
+        uint256 numTokens,
+        uint256 offerPrice
+    ) private returns (bool) {
+        string[] memory lat = new string[](numTokens);
+        string[] memory lon = new string[](numTokens);
+        uint256[] memory prices = new uint256[](numTokens);
+        
+        uint256 totalPrice = 0;
+        uint256 pos = 0;
+        for (uint256 i = 0; i < numTokens; i++) {
+            uint256 delim = indexOfChar(geoIds, byte(";"), pos);
+            string memory geoId = substring(geoIds, pos, delim);
+            lat[i] = getLat(geoId);
+            lon[i] = getLon(geoId);
+            pos = delim + 1;
+            
+            uint256 tokenId = uint256(getTokenId(lat[i], lon[i]));
+            prices[i] = getPrice(tokenId);
+            totalPrice = SafeMath.add(totalPrice, prices[i]);
+        }
+        require(offerPrice >= totalPrice);
+        
+        for (uint256 i = 0; i < numTokens; i++) {
+            if (!_buyToken(lat[i], lon[i], prices[i])) return false;
+        }
+        return true;
+    }
+
     // @dev private helper function for buyToken
     // @param geoId, amount paid (in wei) when calling buyToken
     // @return whether buying was successful
@@ -459,55 +494,6 @@ contract SuperWorldToken is ERC721, Ownable {
         );
         // sellPrices[tokenId] = msg.value;
     } */
-    
-    // @dev Buy multiple tokens at once. Note that if the request is invalid or not enough ether is paid,
-    //      no tokens will be bought
-    // @param string of latitudes and longitudes, formatted "lat1,lon1;lat2,lon2;...;latn,lonn"
-    // @return whether buying was successful
-    function bulkBuy(string memory geoIds) public payable returns (bool) {
-        require(bytes(geoIds).length != 0);
-        uint256 n = 1;
-        for (uint256 pos = indexOfChar(geoIds, byte(";"), 0); pos != 0; pos = indexOfChar(geoIds, byte(";"), pos + 1)) {
-            n++;
-        }
-        
-        return _bulkBuy(geoIds, n, msg.value);
-    }
-    
-    // @dev private helper function for bulkBuy
-    // @param string "lat1,lon1;lat2,lon2;...;latn,lonn", number of tokens to buy, amount paid (in wei)
-    //        when calling bulkBuy
-    // @return whether buying was successful
-    function _bulkBuy(
-        string memory geoIds,
-        uint256 numTokens,
-        uint256 offerPrice
-    ) private returns (bool) {
-        string[] memory lat = new string[](numTokens);
-        string[] memory lon = new string[](numTokens);
-        uint256[] memory prices = new uint256[](numTokens);
-        
-        uint256 totalPrice = 0;
-        uint256 pos = 0;
-        for (uint256 i = 0; i < numTokens; i++) {
-            uint256 delim = indexOfChar(geoIds, byte(";"), pos);
-            string memory geoId = substring(geoIds, pos, delim);
-            lat[i] = getLat(geoId);
-            lon[i] = getLon(geoId);
-            pos = delim + 1;
-            
-            uint256 tokenId = uint256(getTokenId(lat[i], lon[i]));
-            prices[i] = getPrice(tokenId);
-            totalPrice = SafeMath.add(totalPrice, prices[i]);
-        }
-        require(offerPrice >= totalPrice);
-        
-        for (uint256 i = 0; i < numTokens; i++) {
-            if (!_buyToken(lat[i], lon[i], prices[i])) return false;
-        }
-        return true;
-    }
-
 
     // @dev allows the processing of buying a token using event emitting
     // @param takes in the token id, the geolocation, the address of the buyer and seller, the price of the offer and when it was bought.
