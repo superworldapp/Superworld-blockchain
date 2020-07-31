@@ -2,7 +2,7 @@
   "name": "superworld-blockchain",
   "version": "1.0.0",
   "description": "superworld blockchain dev with openseas",
-  "main": "app.js",
+  "main": "app.ts",
   "scripts": {
     "test": "superworld"
   },
