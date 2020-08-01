@@ -4,7 +4,9 @@
   "description": "superworld blockchain dev with openseas",
   "main": "app.ts",
   "scripts": {
-    "test": "superworld"
+    "test": "superworld",
+    "start": "lite-server"
+    
   },
   "repository": {
     "type": "git",
@@ -19,9 +21,10 @@
     "url": "https://github.com/kole-swapnil/Superworld-blockchain/issues"
   },
   "homepage": "https://github.com/kole-swapnil/Superworld-blockchain#readme",
-  "dependencies": {},
-  "devDependencies": {
+  "dependencies": {
+    "lite-server": "^2.5.4",
     "opensea-js": "^1.1.8",
     "web3": "^1.2.11"
-  }
+  },
+  "devDependencies": {}
 }
