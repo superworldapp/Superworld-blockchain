@@ -18,7 +18,7 @@ const seaport = new openSeas.OpenSeaPort(provider, {
 //get an infura key using infura.io
 
 //function used to get a single asset from the OpenSeasjs API
-async function getSingleAsset(tokenId, tokenAddress) {
+async function getSingleAsset(tokenId: string, tokenAddress: string) {
   const asset = await seaport.api.getAsset({
     tokenAddress,
     tokenId
@@ -32,4 +32,5 @@ export interface Asset {
   name?: string,
   decimals?: number
 }
+
 
