@@ -6,7 +6,6 @@
   "scripts": {
     "test": "superworld",
     "start": "lite-server"
-    
   },
   "repository": {
     "type": "git",
@@ -22,7 +21,9 @@
   },
   "homepage": "https://github.com/kole-swapnil/Superworld-blockchain#readme",
   "dependencies": {
+    "dotenv": "^8.2.0",
     "lite-server": "^2.5.4",
+    "module": "^1.2.5",
     "opensea-js": "^1.1.8",
     "web3": "^1.2.11"
   },
