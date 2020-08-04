@@ -18,17 +18,38 @@ const seaport = new openSeas.OpenSeaPort(provider, {
 //get an infura key using infura.io
 
 //function used to get a single asset from the OpenSeasjs API
-async function getSingleAsset(tokenId: string, tokenAddress: string) {
+async function getSingleAsset(tokenId, tokenAddress) {
   const asset = await seaport.api.getAsset({
     tokenAddress,
     tokenId
   });
   return asset
 }
+
+async function getAssetBalance(accountAddress, asset) {
+  const balance = await seaport.getAssetBalance({
+    accountAddress,
+    asset
+  })
+  return balance
+}
+
+async function createBuyOrder(tokenId,tokenAddress,schemaName, accountAddress) {
+  const offer = await seaport.createBuyOrder({
+    asset : {
+      tokenId,
+      tokenAddress,
+      schemaName
+    },
+    accountAddress,
+    startAmount: 1.2
+  });
+  return offer
+}
 export interface Asset {
   tokenId: string,
   tokenAddress: string,
-  schemaName?: WyvernSchemaName,
+  schemaName?: typeof WyvernSchemaName,
   name?: string,
   decimals?: number
 }
