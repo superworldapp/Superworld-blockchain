@@ -1,33 +1,32 @@
-# Blockchain_Info Rinkeby network
+# Certichain
+Store the IPFS hash[for certificates] securely in blockchain
+Running project starts on 31/05/2020
 
-## This repo will only be used for testing of the contracts. All contracts in this repo should only be used on remix IDE
+## How to use
+git clone the branch TruffleReact branch
 
-## Files for Front-end
+--- 
+Note : Do not collapse any terminal
 
-### Superworld_token.sol
-
-- SuperWorldToken contract. Uses new token IDs -- bytes32 ASCII encoding of geo ID (reversible). TokenURI added -- custom url can be used for metadata.
-
-### Superworld_coin.sol
-
-- SuperWorldCoin contract.
-
-### oracle.sol
-
-- Contains the provable contract (no longer needed).
-
-### ERC721Token.sol
-
-- Contains metadata (will help us to integrate with the old contract).
-
-All the contracts we deployed are listed on OpenSea on Rinkeby.
-
-Give your latest updates and tasks assigned to you :
-
+##### terminal1
 ```
-Eg. @username=> 0x1541(address at which contract deployed)=> network_name=> code
+    1.  npm install
+    2.  truffle develop
+```
+##### terminal2
+```terminal2
+    1. truffle migrate --reset
+```
+##### go to metamask
+##### switch to custom network and place the config you got from truffle develop command (most probably will run on 8545 or 7545)
+##### import some accounts with their private key mentioned in truffle develop . To make it work remember to import the first account.
+
+##### terminal3
+```terminal3
+    cd client 
+    cd src
+    npm start
 ```
 
-@kole-swapnil => 0x47c393cb164A0D58Ac757d4615e72f62eC170fE8 => rinkeby => superworld_coin.sol
-
-@kole-swapnil => 0x948A9F4D93d38E7019A8EfBF706a02f1811580f6 => rinkeby => superworld_token.sol
+will take you directly on the webpage of this react app
+and will ask for transaction confirmation from metamask.111
