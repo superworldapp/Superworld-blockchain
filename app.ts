@@ -16,6 +16,8 @@ const seaport = new openSeas.OpenSeaPort(provider, {
 //use environment vairable require('dotenv').config();
 //env vars: process.env.INFURA_KEY
 //get an infura key using infura.io
+//it would be easier to integrate metamask wallet
+//create metamask integration functions to connect to the users wallet
 
 //function used to get a single asset from the OpenSeasjs API
 async function getSingleAsset(tokenId, tokenAddress) {
@@ -46,12 +48,12 @@ async function createBuyOrder(tokenId,tokenAddress,schemaName, accountAddress) {
   });
   return offer
 }
-export interface Asset {
+/*export interface Asset {
   tokenId: string,
   tokenAddress: string,
   schemaName?: typeof WyvernSchemaName,
   name?: string,
   decimals?: number
-}
+}*/
 
 
