@@ -24,6 +24,8 @@ All the contracts we deployed are listed on OpenSea on Rinkeby.
 
 Give your latest updates and tasks assigned to you :
 
+<li>Shrey - Work on OpenSeas and with open seas team, to transfer buy and sell tokens</li>
+
 ```
 Eg. @username=> 0x1541(address at which contract deployed)=> network_name=> code
 ```
