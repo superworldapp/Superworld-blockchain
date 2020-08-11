@@ -567,26 +567,25 @@ contract SuperWorldToken is ERC721, Ownable {
     // @dev Updates contract state before transferring a token.
     // @param addresses of transfer, tokenId of token to be transferred
     // @return none
-    /*
     function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal virtual override {
         super._beforeTokenTransfer(from, to, tokenId);
         (string memory lat, string memory lon) = getGeoFromTokenId(bytes32(tokenId));
         
-        // For now, msg.value is a placeholder for the selling price of the token until we can find a way to
+        // For now, basePrice is a placeholder for the selling price of the token until we can find a way to
         // actually access the price. In particular, we need a way to set sellPrices[tokenId] when listing on OpenSea.
         isSellings[tokenId] = false;
-        recordTransaction(tokenId, sellPrices[tokenId]);
+        recordTransaction(tokenId, basePrice);
         emitBuyTokenEvents(
             tokenId,
             lon,
             lat,
             to,
             from,
-            sellPrices[tokenId],
+            basePrice,
             now
         );
-        // sellPrices[tokenId] = msg.value;
-    } */
+        sellPrices[tokenId] = basePrice;
+    }
 
     // @dev allows the processing of buying a token using event emitting
     // @param takes in the token id, the geolocation, the address of the buyer and seller, the price of the offer and when it was bought.
