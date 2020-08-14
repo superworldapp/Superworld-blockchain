@@ -8,11 +8,11 @@ pragma solidity ^0.6.0;
 // 100000000000000000 baseprice (production 0.1 ETH)
 // http://geo.superworldapp.com/api/json/metadata/get/ metaUrl
 
-import "../node_modules/openzepkole/token/ERC721/ERC721.sol";
-import "../node_modules/openzepkole/access/Ownable.sol";
-import "./libraries/String.sol";
-import "./libraries/Token.sol";
-import "./libraries/SuperWorldEvent.sol";
+import "https://github.com/kole-swapnil/openzepkole/token/ERC721/ERC721.sol";
+import "https://github.com/kole-swapnil/openzepkole/access/Ownable.sol";
+import "https://github.com/kole-swapnil/Superworld-blockchain/String.sol";
+import "https://github.com/kole-swapnil/Superworld-blockchain/Token.sol";
+import "https://github.com/kole-swapnil/Superworld-blockchain/SuperWorldEvent.sol";
 
 abstract contract ERC20Interface {
     // @dev checks whether the transaction between the two addresses of the token went through
