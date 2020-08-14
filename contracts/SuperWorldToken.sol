@@ -10,6 +10,9 @@ pragma solidity ^0.6.0;
 
 import "../node_modules/openzepkole/token/ERC721/ERC721.sol";
 import "../node_modules/openzepkole/access/Ownable.sol";
+import "./libraries/String.sol";
+import "./libraries/Token.sol";
+import "./libraries/SuperWorldEvent.sol";
 
 abstract contract ERC20Interface {
     // @dev checks whether the transaction between the two addresses of the token went through
@@ -56,77 +59,6 @@ contract SuperWorldToken is ERC721, Ownable {
     
     // events
     // TODO: add timestamp (block or UTC)
-    
-    /*
-    THE EVENTS ARE EMBEDDED IN FUNCTIONS, AND ALWAYS LOG TO THE BLOCKCHAIN USING THE PARAMS SENT IN
-    */
-    
-    // @dev logs and saves the params EventBuyToken to the blockchain on a block
-    // @param takes in a buyId, the geolocation, the address of the buyer and the seller, the price bought at,
-    //        the time bought, and id of the property bought.
-    event EventBuyToken(
-        uint256 buyId,
-        string lon,
-        string lat,
-        address indexed buyer,
-        address indexed seller,
-        uint256 price,
-        uint256 timestamp,
-        bytes32 indexed tokenId
-    );
-    
-    // @dev logs and saves the params of EventBuyTokenNearby, specified for buying a token nearby based on the area
-    // @param takes in a buyer id, and the id of the token, as well as the geolocation, the address of buyer and seller,
-    //        as well as the price of token and when the token was bought.
-    event EventBuyTokenNearby(
-        uint256 buyId,
-        bytes32 indexed tokenId1,
-        string lon,
-        string lat,
-        address buyer,
-        address seller,
-        uint256 price,
-        uint256 timestamp
-    );
-    
-    // @dev lists the token on the blockchain and saves/logs the params of the token.
-    // @param takes in the id of the list, the id of the buy, the geolocation, seller address, the price selling/sold at,
-    //        whether it is up for a listing or not, when it was sold, and the tokenId.
-    event EventListToken(
-        uint256 listId,
-        uint256 buyId,
-        string lon,
-        string lat,
-        address indexed seller,
-        uint256 price,
-        bool isListed,
-        uint256 timestamp,
-        bytes32 indexed tokenId
-    );
-    
-    // @dev Listing/selling the token through the event, and logging it through the blockchain
-    // @param the id of the list, the id of the buy, the tokenid, the geolocation and the address of the seller,
-    //        the listed price, and whether it is listed or not, and when it was sold.
-    event EventListTokenNearby(
-        uint256 listId,
-        uint256 buyId,
-        bytes32 indexed tokenId1,
-        string lon,
-        string lat,
-        address seller,
-        uint256 price,
-        bool isListed,
-        uint256 timestamp
-    );
-    
-    // @dev getting approval on the "event" on the real estate purchase
-    // @param address of the buyer, the coins spent on it, where the coins are going, and the data for the event.
-    event EventReceiveApproval(
-        address buyer,
-        uint256 coins,
-        address _coinAddress,
-        bytes32 _data
-    );
 
     constructor(
         address _coinAddress,
@@ -179,48 +111,6 @@ contract SuperWorldToken is ERC721, Ownable {
         boughtPrices[tokenId] = price;
     }
 
-    // @dev provides the token id based on the coordinates(longitude and latitude) of the property
-    // @param a longitude string and a latitude string
-    // @return returns the token id as a 32 bit object, otherwise it returns a 0 as a hex if the lat and lon are empty
-    function getTokenId(string memory lat, string memory lon)
-        public
-        pure
-        returns (bytes32 tokenId)
-    {
-        if (bytes(lat).length == 0 || bytes(lon).length == 0) {
-            return 0x0;
-        }
-        
-        string memory geo = string(abi.encodePacked(lat, ",", lon));
-        assembly {
-            tokenId := mload(add(geo, 32))
-        }
-    }
-    
-    // @dev the opposite of the getTokenId, gives the lat and lon using tokenId
-    // @param takes in a 32 bit tokenId object.
-    // @return returns the latitude and longitude of a location
-    function getGeoFromTokenId(bytes32 tokenId)
-        public
-        pure
-        returns (
-            string memory lat,
-            string memory lon
-        )
-    {
-        uint256 n = 32;
-        while (n > 0 && tokenId[n-1] == 0) {
-            n--;
-        }
-        bytes memory bytesArray = new bytes(n);
-        for (uint256 i = 0; i < n; i++) {
-            bytesArray[i] = tokenId[i];
-        }
-        string memory geoId = string(bytesArray);
-        lat = getLat(geoId);
-        lon = getLon(geoId);
-    }
-
     // @dev returns all info on the token using lat and lon
     // @param takes in two strings, latitude and longitude.
     // @return the token id, the address of the token owner, if it is owned, if it is up for sale, and the price it is
@@ -236,7 +126,7 @@ contract SuperWorldToken is ERC721, Ownable {
             uint256 price
         )
     {
-        tokenId = getTokenId(lat, lon);
+        tokenId = Token.getTokenId(lat, lon);
         uint256 intTokenId = uint256(tokenId);
         if (_tokenOwners.contains(intTokenId)) {
             tokenOwner = _tokenOwners.get(intTokenId);
@@ -255,13 +145,13 @@ contract SuperWorldToken is ERC721, Ownable {
     //        array [address1, address2, ..., addressn], array [buyPrice1, ..., buyPricen]
     // @return none
     function giftTokens(
-        string calldata geoIds,
-        address[] calldata buyers,
-        uint256[] calldata buyPrices
-    ) external onlyOwner() {
+        string memory geoIds,
+        address[] memory buyers,
+        uint256[] memory buyPrices
+    ) public onlyOwner() {
         require(bytes(geoIds).length != 0);
         uint256 n = 1;
-        for (uint256 pos = indexOfChar(geoIds, byte(";"), 0); pos != 0; pos = indexOfChar(geoIds, byte(";"), pos + 1)) {
+        for (uint256 pos = String.indexOfChar(geoIds, byte(";"), 0); pos != 0; pos = String.indexOfChar(geoIds, byte(";"), pos + 1)) {
             n++;
         }
         require(n == buyers.length);
@@ -286,10 +176,10 @@ contract SuperWorldToken is ERC721, Ownable {
 
         uint256 pos = 0;
         for (uint256 i = 0; i < numTokens; i++) {
-            uint256 delim = indexOfChar(geoIds, byte(";"), pos);
-            string memory geoId = substring(geoIds, pos, delim);
-            lat[i] = getLat(geoId);
-            lon[i] = getLon(geoId);
+            uint256 delim = String.indexOfChar(geoIds, byte(";"), pos);
+            string memory geoId = String.substring(geoIds, pos, delim);
+            lat[i] = Token.getLat(geoId);
+            lon[i] = Token.getLon(geoId);
             pos = delim + 1;
         }
 
@@ -307,7 +197,7 @@ contract SuperWorldToken is ERC721, Ownable {
         address buyer,
         uint256 buyPrice
     ) private {
-        uint256 tokenId = uint256(getTokenId(lat, lon));
+        uint256 tokenId = uint256(Token.getTokenId(lat, lon));
         createToken(buyer, tokenId, buyPrice);
         emitBuyTokenEvents(
             tokenId,
@@ -321,18 +211,17 @@ contract SuperWorldToken is ERC721, Ownable {
     }
     
     // Bulk listing
-    
     // @dev list tokens gifted through giftTokens
     // @param string of latitudes and longitudes, formatted "lat1,lon1;lat2,lon2;...;latn,lonn",
     //        array [sellingPrice1, ..., sellingPricen]
     // @return none
     function relistTokens(
-        string calldata geoIds,
-        uint256[] calldata sellingPrices
-    ) external onlyOwner() {
+        string memory geoIds,
+        uint256[] memory sellingPrices
+    ) public onlyOwner() {
         require(bytes(geoIds).length != 0);
         uint256 n = 1;
-        for (uint256 pos = indexOfChar(geoIds, byte(";"), 0); pos != 0; pos = indexOfChar(geoIds, byte(";"), pos + 1)) {
+        for (uint256 pos = String.indexOfChar(geoIds, byte(";"), 0); pos != 0; pos = String.indexOfChar(geoIds, byte(";"), pos + 1)) {
             n++;
         }
         require(n == sellingPrices.length);
@@ -354,10 +243,10 @@ contract SuperWorldToken is ERC721, Ownable {
 
         uint256 pos = 0;
         for (uint256 i = 0; i < numTokens; i++) {
-            uint256 delim = indexOfChar(geoIds, byte(";"), pos);
-            string memory geoId = substring(geoIds, pos, delim);
-            lat[i] = getLat(geoId);
-            lon[i] = getLon(geoId);
+            uint256 delim = String.indexOfChar(geoIds, byte(";"), pos);
+            string memory geoId = String.substring(geoIds, pos, delim);
+            lat[i] = Token.getLat(geoId);
+            lon[i] = Token.getLon(geoId);
             pos = delim + 1;
         }
 
@@ -374,7 +263,7 @@ contract SuperWorldToken is ERC721, Ownable {
         string memory lon,
         uint256 sellingPrice
     ) private {
-        uint256 tokenId = uint256(getTokenId(lat, lon));
+        uint256 tokenId = uint256(Token.getTokenId(lat, lon));
         require(_tokenOwners.contains(tokenId));
         
         isSellings[tokenId] = true;
@@ -399,10 +288,10 @@ contract SuperWorldToken is ERC721, Ownable {
         address _coinAddress,
         bytes32 _data
     ) public {
-        emit EventReceiveApproval(buyer, coins, _coinAddress, _data);
+        emit SuperWorldEvent.EventReceiveApproval(buyer, coins, _coinAddress, _data);
         require(_coinAddress == coinAddress);
-        string memory dataString = bytes32ToString(_data);
-        buyTokenWithCoins(buyer, coins, getLat(dataString), getLon(dataString));
+        string memory dataString = String.bytes32ToString(_data);
+        buyTokenWithCoins(buyer, coins, Token.getLat(dataString), Token.getLon(dataString));
     }
 
     // @dev Indicates the status of transfer (false if it didnt go through)
@@ -414,7 +303,7 @@ contract SuperWorldToken is ERC721, Ownable {
         string memory lat,
         string memory lon
     ) public returns (bool) {
-        uint256 tokenId = uint256(getTokenId(lat, lon));
+        uint256 tokenId = uint256(Token.getTokenId(lat, lon));
         // address seller = _tokenOwners.get(tokenId);
 
         if (!_tokenOwners.contains(tokenId)) {
@@ -447,7 +336,7 @@ contract SuperWorldToken is ERC721, Ownable {
     function buyTokens(string memory geoIds) public payable returns (bool) {
         require(bytes(geoIds).length != 0);
         uint256 n = 1;
-        for (uint256 pos = indexOfChar(geoIds, byte(";"), 0); pos != 0; pos = indexOfChar(geoIds, byte(";"), pos + 1)) {
+        for (uint256 pos = String.indexOfChar(geoIds, byte(";"), 0); pos != 0; pos = String.indexOfChar(geoIds, byte(";"), pos + 1)) {
             n++;
         }
         
@@ -470,13 +359,13 @@ contract SuperWorldToken is ERC721, Ownable {
         uint256 totalPrice = 0;
         uint256 pos = 0;
         for (uint256 i = 0; i < numTokens; i++) {
-            uint256 delim = indexOfChar(geoIds, byte(";"), pos);
-            string memory geoId = substring(geoIds, pos, delim);
-            lat[i] = getLat(geoId);
-            lon[i] = getLon(geoId);
+            uint256 delim = String.indexOfChar(geoIds, byte(";"), pos);
+            string memory geoId = String.substring(geoIds, pos, delim);
+            lat[i] = Token.getLat(geoId);
+            lon[i] = Token.getLon(geoId);
             pos = delim + 1;
             
-            uint256 tokenId = uint256(getTokenId(lat[i], lon[i]));
+            uint256 tokenId = uint256(Token.getTokenId(lat[i], lon[i]));
             prices[i] = getPrice(tokenId);
             totalPrice = SafeMath.add(totalPrice, prices[i]);
         }
@@ -495,7 +384,7 @@ contract SuperWorldToken is ERC721, Ownable {
         private
         returns (bool)
     {
-        uint256 tokenId = uint256(getTokenId(lat, lon));
+        uint256 tokenId = uint256(Token.getTokenId(lat, lon));
         
         // unique token not bought yet
         if (!EnumerableMap.contains(_tokenOwners, tokenId)) {
@@ -569,7 +458,7 @@ contract SuperWorldToken is ERC721, Ownable {
     // @return none
     function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal virtual override {
         super._beforeTokenTransfer(from, to, tokenId);
-        (string memory lat, string memory lon) = getGeoFromTokenId(bytes32(tokenId));
+        (string memory lat, string memory lon) = Token.getGeoFromTokenId(bytes32(tokenId));
         
         // For now, basePrice is a placeholder for the selling price of the token until we can find a way to
         // actually access the price. In particular, we need a way to set sellPrices[tokenId] when listing on OpenSea.
@@ -601,7 +490,7 @@ contract SuperWorldToken is ERC721, Ownable {
     ) private {
         buyId++;
         buyIds[tokenId] = buyId;
-        emit EventBuyToken(
+        emit SuperWorldEvent.EventBuyToken(
             buyId,
             lon,
             lat,
@@ -611,9 +500,9 @@ contract SuperWorldToken is ERC721, Ownable {
             timestamp,
             bytes32(tokenId)
         );
-        emit EventBuyTokenNearby(
+        emit SuperWorldEvent.EventBuyTokenNearby(
             buyId,
-            getTokenId(truncateDecimals(lat, 1), truncateDecimals(lon, 1)),
+            Token.getTokenId(String.truncateDecimals(lat, 1), String.truncateDecimals(lon, 1)),
             lon,
             lat,
             buyer,
@@ -632,7 +521,7 @@ contract SuperWorldToken is ERC721, Ownable {
         string memory lon,
         uint256 sellPrice
     ) public {
-        uint256 tokenId = uint256(getTokenId(lat, lon));
+        uint256 tokenId = uint256(Token.getTokenId(lat, lon));
         require(_tokenOwners.contains(tokenId));
         require(msg.sender == _tokenOwners.get(tokenId));
         isSellings[tokenId] = true;
@@ -652,7 +541,7 @@ contract SuperWorldToken is ERC721, Ownable {
     // @param requests the geolocation of the token
     // @return returns nothing, emits a List Token even
     function delistToken(string memory lat, string memory lon) public {
-        uint256 tokenId = uint256(getTokenId(lat, lon));
+        uint256 tokenId = uint256(Token.getTokenId(lat, lon));
         require(_tokenOwners.contains(tokenId));
         require(msg.sender == _tokenOwners.get(tokenId));
         isSellings[tokenId] = false;
@@ -681,8 +570,8 @@ contract SuperWorldToken is ERC721, Ownable {
         uint256 timestamp
     ) private {
         listId++;
-        bytes32 tokenId = getTokenId(lat, lon);
-        emit EventListToken(
+        bytes32 tokenId = Token.getTokenId(lat, lon);
+        emit SuperWorldEvent.EventListToken(
             listId,
             _buyId,
             lon,
@@ -693,10 +582,10 @@ contract SuperWorldToken is ERC721, Ownable {
             timestamp,
             tokenId
         );
-        emit EventListTokenNearby(
+        emit SuperWorldEvent.EventListTokenNearby(
             listId,
             _buyId,
-            getTokenId(truncateDecimals(lat, 1), truncateDecimals(lon, 1)),
+            Token.getTokenId(String.truncateDecimals(lat, 1), String.truncateDecimals(lon, 1)),
             lon,
             lat,
             seller,
@@ -718,96 +607,6 @@ contract SuperWorldToken is ERC721, Ownable {
             return isSellings[tokenId] ? sellPrices[tokenId] : boughtPrices[tokenId];
         }
     }
-    
-    // @dev trims the decimals to a certain substring and gives it back
-    // @param takes in the string, and trims based on the decimal integer
-    // @return returns the substring based on the decimal values.
-    function truncateDecimals(string memory str, uint256 decimal)
-        private
-        pure
-        returns (string memory)
-    {
-        uint256 decimalIndex = indexOfChar(str, byte("."), 0);
-        bytes memory strBytes = bytes(str);
-        uint256 length = strBytes.length;
-        return (decimalIndex + decimal + 1 > length) ? substring(str, 0, length) : substring(str, 0, decimalIndex + decimal + 1);
-    }
-
-    // @dev standard substring method. Note that endIndex == 0 indicates the substring should be taken to the end of the string.
-    // @param takes in a string, and a starting (included) and ending index (not included in substring).
-    // @return substring
-    function substring(
-        string memory str,
-        uint256 startIndex,
-        uint256 endIndex
-    ) private pure returns (string memory) {
-        bytes memory strBytes = bytes(str);
-        if (endIndex == 0) {
-            endIndex = strBytes.length;
-        }
-        bytes memory result = new bytes(endIndex - startIndex);
-        for (uint256 i = startIndex; i < endIndex; i++) {
-            result[i - startIndex] = strBytes[i];
-        }
-        return string(result);
-    }
-
-    // @dev gets the index of a certain character inside of a string; helper method
-    // @param requires a string, a certain character, and the index to start checking from
-    // @return returns the index of the character in the string
-    function indexOfChar(string memory str, byte char, uint256 startIndex) private pure returns (uint256) {
-        bytes memory strBytes = bytes(str);
-        uint256 length = strBytes.length;
-        for (uint256 i = startIndex; i < length; i++) {
-            if (strBytes[i] == char) {
-                return i;
-            }
-        }
-        return 0;
-    }
-
-    // @dev gets the latitude of the token from a geoId
-    // @param takes in a string of form "Lat,Lon" as a parameter
-    // @return returns the str of the latitude
-    function getLat(string memory str) private pure returns (string memory) {
-        uint256 index = indexOfChar(str, byte(","), 0);
-        return substring(str, 0, index);
-    }
-
-    // @dev gets the longitude of the token from a geoId
-    // @param takes in a string of form "Lat,Lon" as a parameter
-    // @return returns the str of the longitude
-    function getLon(string memory str) private pure returns (string memory) {
-        uint256 index = indexOfChar(str, byte(","), 0);
-        return substring(str, index + 1, 0);
-    }
-
-    
-    // @dev converts ASCII encoding into a string
-    // @param bytes32 ASCII encoding
-    // @return string version
-    function bytes32ToString(bytes32 _dataBytes32)
-        private
-        pure
-        returns (string memory)
-    {
-        bytes memory bytesString = new bytes(32);
-        uint256 charCount = 0;
-        uint256 j;
-        for (j = 0; j < 32; j++) {
-            // outscope declaration
-            byte char = byte(bytes32(uint256(_dataBytes32) * 2**(8 * j)));
-            if (char != 0) {
-                bytesString[charCount] = char;
-                charCount++;
-            }
-        }
-        bytes memory bytesStringTrimmed = new bytes(charCount);
-        for (j = 0; j < charCount; j++) {
-            bytesStringTrimmed[j] = bytesString[j];
-        }
-        return string(bytesStringTrimmed);
-    }
 
     // @devs: withdraws a certain amount from the owner
     // @param no params taken in
@@ -817,41 +616,11 @@ contract SuperWorldToken is ERC721, Ownable {
         (msg.sender).transfer(balance);
     }
     
-    // @devs: Converts a number to a string literal of its hex representation (without the '0x' prefix)
-    // @param a number
-    // @return string literal of the number's hex
-    function toHexString(uint256 value) internal pure returns (string memory) {
-        // Inspired by OraclizeAPI's implementation - MIT license
-        // https://github.com/oraclize/ethereum-api/blob/b42146b063c7d6ee1358846c198246239e9360e8/oraclizeAPI_0.4.25.sol
-        if (value == 0) {
-            return "0";
-        }
-        uint256 temp = value;
-        uint256 digits;
-        while (temp != 0) {
-            digits++;
-            temp /= 16;
-        }
-        bytes memory buffer = new bytes(digits);
-        uint256 index = digits - 1;
-        temp = value;
-        while (temp != 0) {
-            uint256 digit = temp % 16;
-            if (digit < 10) {
-                buffer[index--] = byte(uint8(48 + digit));
-            } else {
-                buffer[index--] = byte(uint8(87 + digit));
-            }
-            temp /= 16;
-        }
-        return string(buffer);
-    }
-    
     // @devs: gets the metadata URL for a token.
     // @param tokenId
     // @return string containing the URL where the token's metadata is stored
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
-        string memory x = string(abi.encodePacked(metaUrl, '0x', toHexString(tokenId)));
+        string memory x = string(abi.encodePacked(metaUrl, '0x', String.toHexString(tokenId)));
         return x;
     }
 }
