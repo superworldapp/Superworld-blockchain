@@ -12,7 +12,7 @@ import "../node_modules/openzepkole/token/ERC721/ERC721.sol";
 import "../node_modules/openzepkole/access/Ownable.sol";
 import "./libraries/String.sol";
 import "./libraries/Token.sol";
-import "./libraries/SuperWorldEvent.sol";
+// import "./libraries/SuperWorldEvent.sol";
 
 abstract contract ERC20Interface {
     // @dev checks whether the transaction between the two addresses of the token went through
@@ -59,6 +59,77 @@ contract SuperWorldToken is ERC721, Ownable {
     
     // events
     // TODO: add timestamp (block or UTC)
+
+    /*
+    THE EVENTS ARE EMBEDDED IN FUNCTIONS, AND ALWAYS LOG TO THE BLOCKCHAIN USING THE PARAMS SENT IN
+    */
+    
+    // @dev logs and saves the params EventBuyToken to the blockchain on a block
+    // @param takes in a buyId, the geolocation, the address of the buyer and the seller, the price bought at,
+    //        the time bought, and id of the property bought.
+    event EventBuyToken(
+        uint256 buyId,
+        string lon,
+        string lat,
+        address indexed buyer,
+        address indexed seller,
+        uint256 price,
+        uint256 timestamp,
+        bytes32 indexed tokenId
+    );
+    
+    // @dev logs and saves the params of EventBuyTokenNearby, specified for buying a token nearby based on the area
+    // @param takes in a buyer id, and the id of the token, as well as the geolocation, the address of buyer and seller,
+    //        as well as the price of token and when the token was bought.
+    event EventBuyTokenNearby(
+        uint256 buyId,
+        bytes32 indexed tokenId1,
+        string lon,
+        string lat,
+        address buyer,
+        address seller,
+        uint256 price,
+        uint256 timestamp
+    );
+    
+    // @dev lists the token on the blockchain and saves/logs the params of the token.
+    // @param takes in the id of the list, the id of the buy, the geolocation, seller address, the price selling/sold at,
+    //        whether it is up for a listing or not, when it was sold, and the tokenId.
+    event EventListToken(
+        uint256 listId,
+        uint256 buyId,
+        string lon,
+        string lat,
+        address indexed seller,
+        uint256 price,
+        bool isListed,
+        uint256 timestamp,
+        bytes32 indexed tokenId
+    );
+    
+    // @dev Listing/selling the token through the event, and logging it through the blockchain
+    // @param the id of the list, the id of the buy, the tokenid, the geolocation and the address of the seller,
+    //        the listed price, and whether it is listed or not, and when it was sold.
+    event EventListTokenNearby(
+        uint256 listId,
+        uint256 buyId,
+        bytes32 indexed tokenId1,
+        string lon,
+        string lat,
+        address seller,
+        uint256 price,
+        bool isListed,
+        uint256 timestamp
+    );
+    
+    // @dev getting approval on the "event" on the real estate purchase
+    // @param address of the buyer, the coins spent on it, where the coins are going, and the data for the event.
+    event EventReceiveApproval(
+        address buyer,
+        uint256 coins,
+        address _coinAddress,
+        bytes32 _data
+    );
 
     constructor(
         address _coinAddress,
@@ -288,7 +359,7 @@ contract SuperWorldToken is ERC721, Ownable {
         address _coinAddress,
         bytes32 _data
     ) public {
-        emit SuperWorldEvent.EventReceiveApproval(buyer, coins, _coinAddress, _data);
+        emit EventReceiveApproval(buyer, coins, _coinAddress, _data);
         require(_coinAddress == coinAddress);
         string memory dataString = String.bytes32ToString(_data);
         buyTokenWithCoins(buyer, coins, Token.getLat(dataString), Token.getLon(dataString));
@@ -490,7 +561,7 @@ contract SuperWorldToken is ERC721, Ownable {
     ) private {
         buyId++;
         buyIds[tokenId] = buyId;
-        emit SuperWorldEvent.EventBuyToken(
+        emit EventBuyToken(
             buyId,
             lon,
             lat,
@@ -500,7 +571,7 @@ contract SuperWorldToken is ERC721, Ownable {
             timestamp,
             bytes32(tokenId)
         );
-        emit SuperWorldEvent.EventBuyTokenNearby(
+        emit EventBuyTokenNearby(
             buyId,
             Token.getTokenId(String.truncateDecimals(lat, 1), String.truncateDecimals(lon, 1)),
             lon,
@@ -571,7 +642,7 @@ contract SuperWorldToken is ERC721, Ownable {
     ) private {
         listId++;
         bytes32 tokenId = Token.getTokenId(lat, lon);
-        emit SuperWorldEvent.EventListToken(
+        emit EventListToken(
             listId,
             _buyId,
             lon,
@@ -582,7 +653,7 @@ contract SuperWorldToken is ERC721, Ownable {
             timestamp,
             tokenId
         );
-        emit SuperWorldEvent.EventListTokenNearby(
+        emit EventListTokenNearby(
             listId,
             _buyId,
             Token.getTokenId(String.truncateDecimals(lat, 1), String.truncateDecimals(lon, 1)),
