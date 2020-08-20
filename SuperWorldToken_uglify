@@ -37,22 +37,22 @@ contract SuperWorldToken is ERC721, Ownable {
     address public coinAddress;
     ERC20Interface public superWorldCoin;
 
-    uint256 public c;
-    uint256 public p;
-    uint256 public b = 0;
-    uint256 public l = 0;
-    string public m;
+    uint256 public percentageCut;
+    uint256 public basePrice;
+    uint256 public buyId = 0;
+    uint256 public listId = 0;
+    string public metaUrl;
 
     // tokenId => bought price in wei
-    mapping(uint256 => uint256) public bp;
+    mapping(uint256 => uint256) public boughtPrices;
 
     // tokenId => sell price in wei
-    mapping(uint256 => uint256) public sp;
+    mapping(uint256 => uint256) public sellPrices;
 
     // tokenId => is selling
-    mapping(uint256 => bool) public I;
+    mapping(uint256 => bool) public isSellings;
     // tokenId => buyId
-    mapping(uint256 => uint256) public bs;
+    mapping(uint256 => uint256) public buyIds;
     
     // events
     // TODO: add timestamp (block or UTC)
@@ -65,27 +65,27 @@ contract SuperWorldToken is ERC721, Ownable {
     // @param takes in a buyId, the geolocation, the address of the buyer and the seller, the price bought at,
     //        the time bought, and id of the property bought.
     event B(
-        uint256 b,
+        uint256 i,
         string x,
         string y,
-        address indexed T,
-        address indexed F,
-        uint256 d,
+        address indexed b,
+        address indexed s,
+        uint256 p,
         uint256 t,
-        bytes32 indexed id
+        bytes32 indexed n
     );
     
     // @dev logs and saves the params of EventBuyTokenNearby, specified for buying a token nearby based on the area
     // @param takes in a buyer id, and the id of the token, as well as the geolocation, the address of buyer and seller,
     //        as well as the price of token and when the token was bought.
-    event BN(
-        uint256 b,
-        bytes32 indexed id1,
+    event C(
+        uint256 i,
+        bytes32 indexed m,
         string x,
         string y,
-        address T,
-        address F,
-        uint256 d,
+        address b,
+        address s,
+        uint256 p,
         uint256 t
     );
     
@@ -93,39 +93,39 @@ contract SuperWorldToken is ERC721, Ownable {
     // @param takes in the id of the list, the id of the buy, the geolocation, seller address, the price selling/sold at,
     //        whether it is up for a listing or not, when it was sold, and the tokenId.
     event L(
-        uint256 l,
-        uint256 b,
+        uint256 j,
+        uint256 i,
         string x,
         string y,
-        address indexed F,
-        uint256 d,
-        bool il,
+        address indexed s,
+        uint256 p,
+        bool l,
         uint256 t,
-        bytes32 indexed id
+        bytes32 indexed n
     );
     
     // @dev Listing/selling the token through the event, and logging it through the blockchain
     // @param the id of the list, the id of the buy, the tokenid, the geolocation and the address of the seller,
     //        the listed price, and whether it is listed or not, and when it was sold.
-    event LN(
-        uint256 l,
-        uint256 b,
-        bytes32 indexed id1,
+    event M(
+        uint256 j,
+        uint256 i,
+        bytes32 indexed m,
         string x,
         string y,
-        address F,
-        uint256 d,
-        bool il,
+        address s,
+        uint256 p,
+        bool l,
         uint256 t
     );
     
     // @dev getting approval on the "event" on the real estate purchase
     // @param address of the buyer, the coins spent on it, where the coins are going, and the data for the event.
-    event R(
-        address T,
-        uint256 s,
-        address a,
-        bytes32 d
+    event EventReceiveApproval(
+        address buyer,
+        uint256 coins,
+        address _coinAddress,
+        bytes32 _data
     );
 
     constructor(
@@ -136,12 +136,12 @@ contract SuperWorldToken is ERC721, Ownable {
     ) public ERC721("SuperWorld", "SUPERWORLD") {
         coinAddress = _coinAddress;
         superWorldCoin = ERC20Interface(coinAddress);
-        c = _percentageCut;
-        p = _basePrice;
-        m = _metaUrl;
-        b = 0;
-        l = 0;
-        _setBaseURI(m);
+        percentageCut = _percentageCut;
+        basePrice = _basePrice;
+        metaUrl = _metaUrl;
+        buyId = 0;
+        listId = 0;
+        _setBaseURI(metaUrl);
     }
     
     // @dev creates a base price that has to be greater than zero for the token
@@ -149,7 +149,7 @@ contract SuperWorldToken is ERC721, Ownable {
     // @return no return, mutator
     function setBasePrice(uint256 _basePrice) public onlyOwner() {
         require(_basePrice > 0);
-        p = _basePrice;
+        basePrice = _basePrice;
     }
 
     // @dev sets the percentage cut of the token for the contract variable
@@ -157,7 +157,7 @@ contract SuperWorldToken is ERC721, Ownable {
     // @return no return, mutator
     function setPercentageCut(uint256 _percentageCut) public onlyOwner() {
         require(_percentageCut > 0);
-        c = _percentageCut;
+        percentageCut = _percentageCut;
     }
 
     // @dev generates a new token, using recordTransactions directly below, private method
@@ -176,7 +176,7 @@ contract SuperWorldToken is ERC721, Ownable {
     // @param takes the token's id and the price of the tokenId
     // @return returns nothing
     function recordTransaction(uint256 tokenId, uint256 price) private {
-        bp[tokenId] = price;
+        boughtPrices[tokenId] = price;
     }
 
     // @dev provides the token id based on the coordinates(longitude and latitude) of the property
@@ -245,7 +245,7 @@ contract SuperWorldToken is ERC721, Ownable {
             tokenOwner = address(0);
             isOwned = false;
         }
-        isSelling = I[intTokenId];
+        isSelling = isSellings[intTokenId];
         price = getPrice(intTokenId);
     }
     
@@ -377,10 +377,10 @@ contract SuperWorldToken is ERC721, Ownable {
         uint256 tokenId = uint256(getTokenId(lat, lon));
         require(_tokenOwners.contains(tokenId));
         
-        I[tokenId] = true;
-        sp[tokenId] = sellingPrice;
+        isSellings[tokenId] = true;
+        sellPrices[tokenId] = sellingPrice;
         emitListTokenEvents(
-            bs[tokenId],
+            buyIds[tokenId],
             lon,
             lat,
             _tokenOwners.get(tokenId),
@@ -399,7 +399,7 @@ contract SuperWorldToken is ERC721, Ownable {
         address _coinAddress,
         bytes32 _data
     ) public {
-        emit R(buyer, coins, _coinAddress, _data);
+        emit EventReceiveApproval(buyer, coins, _coinAddress, _data);
         require(_coinAddress == coinAddress);
         string memory dataString = bytes32ToString(_data);
         buyTokenWithCoins(buyer, coins, getLat(dataString), getLon(dataString));
@@ -419,12 +419,12 @@ contract SuperWorldToken is ERC721, Ownable {
 
         if (!_tokenOwners.contains(tokenId)) {
             // not owned
-            require(coins >= p);
-            require(superWorldCoin.balanceOf(buyer) >= p);
-            if (!superWorldCoin.transferFrom(buyer, address(this), p)) {
+            require(coins >= basePrice);
+            require(superWorldCoin.balanceOf(buyer) >= basePrice);
+            if (!superWorldCoin.transferFrom(buyer, address(this), basePrice)) {
                 return false;
             }
-            createToken(buyer, tokenId, p);
+            createToken(buyer, tokenId, basePrice);
             _tokenOwners.set(tokenId, buyer);
             emitBuyTokenEvents(
                 tokenId,
@@ -432,7 +432,7 @@ contract SuperWorldToken is ERC721, Ownable {
                 lat,
                 buyer,
                 address(0),
-                p,
+                basePrice,
                 now
             );
             return true;
@@ -499,7 +499,7 @@ contract SuperWorldToken is ERC721, Ownable {
         
         // unique token not bought yet
         if (!EnumerableMap.contains(_tokenOwners, tokenId)) {
-            require(offerPrice >= p);
+            require(offerPrice >= basePrice);
             createToken(msg.sender, tokenId, offerPrice);
             EnumerableMap.set(_tokenOwners, tokenId, msg.sender);
             emitBuyTokenEvents(
@@ -516,29 +516,29 @@ contract SuperWorldToken is ERC721, Ownable {
 
         address seller = _tokenOwners.get(tokenId);
         // check selling
-        require(I[tokenId] == true);
+        require(isSellings[tokenId] == true);
         // check sell price > 0
-        require(sp[tokenId] > 0);
+        require(sellPrices[tokenId] > 0);
         // check offer price >= sell price
-        require(offerPrice >= sp[tokenId]);
+        require(offerPrice >= sellPrices[tokenId]);
         // check seller != buyer
         require(msg.sender != seller);
 
         // send percentage of cut to contract owner
         uint256 fee = SafeMath.div(
-            SafeMath.mul(offerPrice, c),
+            SafeMath.mul(offerPrice, percentageCut),
             100
         );
         uint256 priceAfterFee = SafeMath.sub(offerPrice, fee);
 
         // mark not selling
-        I[tokenId] = false;
+        isSellings[tokenId] = false;
 
         // send payment
         address payable _seller = payable(seller);
         if (!_seller.send(priceAfterFee)) {
             // if failed to send, mark selling
-            I[tokenId] = true;
+            isSellings[tokenId] = true;
             return false;
         }
 
@@ -550,7 +550,7 @@ contract SuperWorldToken is ERC721, Ownable {
         _holderTokens[seller].remove(tokenId);
         _holderTokens[msg.sender].add(tokenId);
         recordTransaction(tokenId, offerPrice);
-        sp[tokenId] = offerPrice;
+        sellPrices[tokenId] = offerPrice;
         _tokenOwners.set(tokenId, msg.sender);
         emitBuyTokenEvents(
             tokenId,
@@ -573,18 +573,18 @@ contract SuperWorldToken is ERC721, Ownable {
         
         // For now, basePrice is a placeholder for the selling price of the token until we can find a way to
         // actually access the price. In particular, we need a way to set sellPrices[tokenId] when listing on OpenSea.
-        I[tokenId] = false;
-        recordTransaction(tokenId, p);
+        isSellings[tokenId] = false;
+        recordTransaction(tokenId, basePrice);
         emitBuyTokenEvents(
             tokenId,
             lon,
             lat,
             to,
             from,
-            p,
+            basePrice,
             now
         );
-        sp[tokenId] = p;
+        sellPrices[tokenId] = basePrice;
     }
 
     // @dev allows the processing of buying a token using event emitting
@@ -599,10 +599,10 @@ contract SuperWorldToken is ERC721, Ownable {
         uint256 offerPrice,
         uint256 timestamp
     ) private {
-        b++;
-        bs[tokenId] = b;
+        buyId++;
+        buyIds[tokenId] = buyId;
         emit B(
-            b,
+            buyId,
             lon,
             lat,
             buyer,
@@ -611,8 +611,8 @@ contract SuperWorldToken is ERC721, Ownable {
             timestamp,
             bytes32(tokenId)
         );
-        emit BN(
-            b,
+        emit C(
+            buyId,
             getTokenId(truncateDecimals(lat, 1), truncateDecimals(lon, 1)),
             lon,
             lat,
@@ -635,10 +635,10 @@ contract SuperWorldToken is ERC721, Ownable {
         uint256 tokenId = uint256(getTokenId(lat, lon));
         require(_tokenOwners.contains(tokenId));
         require(msg.sender == _tokenOwners.get(tokenId));
-        I[tokenId] = true;
-        sp[tokenId] = sellPrice;
+        isSellings[tokenId] = true;
+        sellPrices[tokenId] = sellPrice;
         emitListTokenEvents(
-            bs[tokenId],
+            buyIds[tokenId],
             lon,
             lat,
             msg.sender,
@@ -655,17 +655,17 @@ contract SuperWorldToken is ERC721, Ownable {
         uint256 tokenId = uint256(getTokenId(lat, lon));
         require(_tokenOwners.contains(tokenId));
         require(msg.sender == _tokenOwners.get(tokenId));
-        I[tokenId] = false;
+        isSellings[tokenId] = false;
         emitListTokenEvents(
-            bs[tokenId],
+            buyIds[tokenId],
             lon,
             lat,
             msg.sender,
-            sp[tokenId],
+            sellPrices[tokenId],
             false,
             now
         );
-        sp[tokenId] = 0;
+        sellPrices[tokenId] = 0;
     }
 
     // @dev does the list token event, used by many previous functions
@@ -680,10 +680,10 @@ contract SuperWorldToken is ERC721, Ownable {
         bool isListed,
         uint256 timestamp
     ) private {
-        l++;
+        listId++;
         bytes32 tokenId = getTokenId(lat, lon);
         emit L(
-            l,
+            listId,
             _buyId,
             lon,
             lat,
@@ -693,8 +693,8 @@ contract SuperWorldToken is ERC721, Ownable {
             timestamp,
             tokenId
         );
-        emit LN(
-            l,
+        emit M(
+            listId,
             _buyId,
             getTokenId(truncateDecimals(lat, 1), truncateDecimals(lon, 1)),
             lon,
@@ -712,10 +712,10 @@ contract SuperWorldToken is ERC721, Ownable {
     function getPrice(uint256 tokenId) public view returns (uint256) {
         if (!_tokenOwners.contains(tokenId)) {
             // not owned
-            return p;
+            return basePrice;
         } else {
             // owned
-            return I[tokenId] ? sp[tokenId] : bp[tokenId];
+            return isSellings[tokenId] ? sellPrices[tokenId] : boughtPrices[tokenId];
         }
     }
     
@@ -851,7 +851,7 @@ contract SuperWorldToken is ERC721, Ownable {
     // @param tokenId
     // @return string containing the URL where the token's metadata is stored
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
-        string memory x = string(abi.encodePacked(m, '0x', toHexString(tokenId)));
+        string memory x = string(abi.encodePacked(metaUrl, '0x', toHexString(tokenId)));
         return x;
     }
 }
